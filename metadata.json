@@ -1,0 +1,7 @@
+{
+  "name": "RideCar - Ferramenta do Motorista",
+  "description": "Uma ferramenta para motoristas gerenciarem suas corridas, inserindo dados do passageiro, rastreando a viagem e facilitando a cobrança via WhatsApp.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
