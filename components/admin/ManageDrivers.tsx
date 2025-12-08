@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Driver } from '../../types';
 import { UserIcon, CarIcon, PinIcon } from '../icons';
@@ -8,9 +9,12 @@ interface ManageDriversProps {
 }
 
 const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
+  // Only show regular drivers, not admins
+  const regularDrivers = drivers.filter(d => d.role !== 'admin');
+  
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Omit<Driver, 'id'>>({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: ''});
+  const [formData, setFormData] = useState<Omit<Driver, 'id' | 'role'>>({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: ''});
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -45,21 +49,27 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name && formData.email && formData.password && formData.carModel && formData.licensePlate && formData.city) {
-      let updatedDrivers;
+      // Get the list of admins to preserve them
+      const admins = drivers.filter(d => d.role === 'admin');
+      
+      let updatedDriversList;
       if (editingDriverId) {
           // Update existing driver
-          updatedDrivers = drivers.map(d => 
-            d.id === editingDriverId ? { id: d.id, ...formData } : d
+          updatedDriversList = regularDrivers.map(d => 
+            d.id === editingDriverId ? { id: d.id, ...formData, role: 'driver' as const } : d
           );
       } else {
           // Add new driver
           const newDriver: Driver = {
             id: `driver_${Date.now()}`,
             ...formData,
+            role: 'driver' // Force role to driver
           };
-          updatedDrivers = [...drivers, newDriver];
+          updatedDriversList = [...regularDrivers, newDriver];
       }
-      onSave(updatedDrivers);
+      
+      // Combine regular drivers with admins and save
+      onSave([...admins, ...updatedDriversList]);
       handleCancel(); // Reset and close form
     }
   };
@@ -187,11 +197,11 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
         </div>
       )}
 
-      {drivers.length === 0 ? (
+      {regularDrivers.length === 0 ? (
         <p className="text-gray-400 text-center mt-8">Nenhum motorista cadastrado ainda.</p>
       ) : (
         <div className="space-y-3">
-          {drivers.map((driver) => (
+          {regularDrivers.map((driver) => (
             <div key={driver.id} className="bg-gray-700 p-4 rounded-lg flex justify-between items-center flex-wrap gap-2">
               <div>
                 <p className="font-bold text-white">{driver.name}</p>

@@ -1,18 +1,25 @@
-import React from 'react';
 
+import React from 'react';
+import ReactDOMServer from 'react-dom/server';
+
+// LOGO ATUALIZADA: FOTO REAL DE FRENTE COM NEON
 export const RideCarLogo = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 150 40" xmlns="http://www.w3.org/2000/svg" className={className} fill="currentColor">
-    <defs>
-      <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" style={{stopColor: '#F97316'}} />
-        <stop offset="100%" style={{stopColor: '#EA580C'}} />
-      </linearGradient>
-    </defs>
-    <path d="M25.3,12.3c-2.3-2.4-5.5-3.8-8.9-3.8H5c-1.1,0-2,0.9-2,2v19c0,1.1,0.9,2,2,2h11.4c3.4,0,6.6-1.4,8.9-3.8 C28.9,26.1,30.5,22,29.9,17.8C29.3,13.6,27.7,14.7,25.3,12.3z M16.4,27.5H10v-15h6.4c2.8,0,5,2.2,5,5S19.2,27.5,16.4,27.5z" fill="url(#logoGradient)"/>
-    <text x="38" y="28" fontFamily="Arial, sans-serif" fontSize="24" fontWeight="bold" fill="#FFFFFF">
-      RideCar
-    </text>
-  </svg>
+  <div className={`flex flex-col items-center justify-center ${className}`}>
+    {/* Círculo Preto com Borda Neon Laranja */}
+    <div className="relative w-40 h-40 rounded-full border-[4px] border-orange-500 bg-black overflow-hidden shadow-[0_0_30px_rgba(249,115,22,0.9)] z-10 shrink-0 flex items-center justify-center">
+        <img 
+            /* Foto de um carro esportivo escuro de frente */
+            src="https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=500&auto=format&fit=crop" 
+            alt="RideCar Logo" 
+            className="w-full h-full object-cover scale-110 translate-y-1"
+        />
+    </div>
+    
+    {/* Texto RideCar Embaixo */}
+    <h1 className="mt-4 text-5xl font-black italic tracking-tighter text-white drop-shadow-2xl" style={{ fontFamily: 'sans-serif', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
+        Ride<span className="text-orange-500" style={{ textShadow: '0 0 15px rgba(249,115,22,0.8)' }}>Car</span>
+    </h1>
+  </div>
 );
 
 export const UserIcon = ({ className }: { className?: string }) => (

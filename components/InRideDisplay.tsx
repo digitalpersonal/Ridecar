@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
-import type { Ride, Driver, GeolocationCoordinates } from '../types';
+import type { Ride, Driver, GeolocationCoordinates, FareRule, AddressSuggestion } from '../types';
 import { useRideTracking } from '../hooks/useRideTracking';
-import { getCoordinatesForAddress } from '../services/geocodingService';
-import { WhatsAppIcon, ExpandIcon, CompressIcon } from './icons';
+import { getCoordinatesForAddress, geocodeAddress } from '../services/geocodingService';
+import { useDebounce } from '../hooks/useDebounce';
+import { WhatsAppIcon, ExpandIcon, CompressIcon, PinIcon } from './icons';
 import RideMap from './RideMap';
 
 interface InRideDisplayProps {
@@ -11,13 +13,22 @@ interface InRideDisplayProps {
   onStopRide: (finalDistance: number) => void;
   onSendWhatsApp: () => void;
   onComplete: () => void;
+  onUpdateDestination: (destination: { address: string; city: string }) => void;
+  fareRules: FareRule[];
 }
 
-const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide, onSendWhatsApp, onComplete }) => {
+const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide, onSendWhatsApp, onComplete, onUpdateDestination, fareRules }) => {
   const [elapsedTime, setElapsedTime] = useState(Date.now() - ride.startTime);
   const isRideFinished = !!ride.endTime;
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [destinationCoords, setDestinationCoords] = useState<GeolocationCoordinates | null>(null);
+
+  // Edit Destination State
+  const [isEditingDest, setIsEditingDest] = useState(false);
+  const [editAddress, setEditAddress] = useState(ride.destination.address);
+  const [editCity, setEditCity] = useState(ride.destination.city);
+  const [destSuggestions, setDestSuggestions] = useState<AddressSuggestion[]>([]);
+  const debouncedAddress = useDebounce(editAddress, 500);
 
   const { distance, currentPosition, path } = useRideTracking(!isRideFinished);
   
@@ -46,6 +57,28 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
     };
   }, [ride.startTime, isRideFinished]);
 
+  // Sync edit state with ride changes
+  useEffect(() => {
+     if (!isEditingDest) {
+         setEditAddress(ride.destination.address);
+         setEditCity(ride.destination.city);
+     }
+  }, [ride.destination, isEditingDest]);
+
+  // Fetch suggestions when editing
+  useEffect(() => {
+    if (isEditingDest && debouncedAddress.length > 2 && editCity) {
+        const fetchSuggestions = async () => {
+            const results = await geocodeAddress(debouncedAddress, editCity);
+            setDestSuggestions(results);
+        }
+        fetchSuggestions();
+    } else {
+        setDestSuggestions([]);
+    }
+  }, [debouncedAddress, editCity, isEditingDest]);
+
+
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -53,10 +86,36 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
     return `${minutes}:${seconds}`;
   };
 
+  const handleSaveDestination = () => {
+      if (editAddress.trim() && editCity.trim()) {
+          onUpdateDestination({ address: editAddress, city: editCity });
+          setIsEditingDest(false);
+          setDestSuggestions([]);
+      }
+  };
+
+  const handleCancelEdit = () => {
+      setIsEditingDest(false);
+      setEditAddress(ride.destination.address);
+      setEditCity(ride.destination.city);
+      setDestSuggestions([]);
+  }
+
+  const handleDestSuggestionClick = (suggestion: AddressSuggestion) => {
+    setEditAddress(suggestion.description);
+    setDestSuggestions([]);
+  };
+
   // Determine values to display
   const displayDistance = isRideFinished ? ride.distance : distance;
   const displayTime = isRideFinished && ride.endTime ? ride.endTime - ride.startTime : elapsedTime;
   
+  const availableCities = [...fareRules].sort((a, b) => a.destinationCity.localeCompare(b.destinationCity));
+  // If current city is not in rules (e.g. manual entry or legacy), add it? 
+  // For simplicity, just map rules, if user has custom city, the select might not show it perfectly if we forced it, 
+  // but let's assume valid cities. We can fallback to text input if needed but prompt implies selecting address.
+  // Using a datalist or similar could be better but let's stick to Select for cities to match StartRideForm.
+
   const renderButtons = () => {
     if (isRideFinished) {
       return (
@@ -121,7 +180,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
       {/* Bottom Panel Section */}
       <div className="bg-gray-800 rounded-t-2xl shadow-lg p-6 flex-shrink-0 z-10">
         {/* Ride Info Header */}
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-400">Passageiro</p>
@@ -132,6 +191,82 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
               <p className="text-xs font-mono bg-gray-700 px-2 py-1 rounded text-gray-300 mt-1">{driver.licensePlate}</p>
             </div>
           </div>
+        </div>
+
+        {/* Destination Info & Edit */}
+        <div className="mb-6 bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+           {!isEditingDest ? (
+               <div className="flex items-center justify-between">
+                   <div className="flex items-center overflow-hidden">
+                       <PinIcon className="h-6 w-6 text-orange-500 mr-3 flex-shrink-0" />
+                       <div className="truncate">
+                           <p className="text-xs text-gray-400">Destino</p>
+                           <p className="text-white font-medium truncate">{ride.destination.address}</p>
+                           <p className="text-xs text-gray-400">{ride.destination.city}</p>
+                       </div>
+                   </div>
+                   {!isRideFinished && (
+                       <button 
+                           onClick={() => setIsEditingDest(true)}
+                           className="ml-2 p-2 text-gray-400 hover:text-white bg-gray-700 rounded-full hover:bg-gray-600 transition-colors"
+                           title="Editar Destino"
+                       >
+                           <i className="fa-solid fa-pencil"></i>
+                       </button>
+                   )}
+               </div>
+           ) : (
+               <div className="space-y-3">
+                   <p className="text-xs text-orange-400 font-bold uppercase">Editar Destino</p>
+                   
+                   {/* City Select */}
+                    <select
+                        value={editCity}
+                        onChange={(e) => setEditCity(e.target.value)}
+                        className="bg-gray-800 p-2 w-full text-white text-sm rounded border border-gray-600 focus:border-orange-500 focus:outline-none"
+                    >
+                        <option value="">Selecione a cidade...</option>
+                        {availableCities.map(rule => (
+                        <option key={rule.id} value={rule.destinationCity}>{rule.destinationCity}</option>
+                        ))}
+                    </select>
+
+                   {/* Address Input */}
+                   <div className="relative">
+                        <input 
+                            type="text" 
+                            value={editAddress}
+                            onChange={(e) => setEditAddress(e.target.value)}
+                            placeholder="Endereço"
+                            className="bg-gray-800 p-2 w-full text-white text-sm rounded border border-gray-600 focus:border-orange-500 focus:outline-none"
+                        />
+                         {destSuggestions.length > 0 && (
+                            <ul className="absolute z-50 w-full mt-1 bg-gray-700 rounded-lg shadow-xl max-h-32 overflow-y-auto border border-gray-600 bottom-full mb-1">
+                            {destSuggestions.map((s, i) => (
+                                <li key={i} onClick={() => handleDestSuggestionClick(s)} className="px-3 py-2 text-sm text-white cursor-pointer hover:bg-gray-600 border-b border-gray-600 last:border-0">{s.description}</li>
+                            ))}
+                            </ul>
+                        )}
+                   </div>
+
+                   {/* Actions */}
+                   <div className="flex space-x-2">
+                       <button 
+                           onClick={handleSaveDestination}
+                           disabled={!editAddress.trim() || !editCity}
+                           className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                       >
+                           Salvar
+                       </button>
+                       <button 
+                           onClick={handleCancelEdit}
+                           className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-sm font-bold py-2 rounded"
+                       >
+                           Cancelar
+                       </button>
+                   </div>
+               </div>
+           )}
         </div>
 
         {/* Ride stats */}

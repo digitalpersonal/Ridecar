@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
 import type { Ride, Passenger, Driver, FareRule } from '../../types';
 import Dashboard from './Dashboard';
 import RideHistory from './RideHistory';
 import ManagePassengers from './ManagePassengers';
 import ManageDrivers from './ManageDrivers';
+import ManageAdmins from './ManageAdmins';
 import ManageFares from './ManageFares';
 import Financials from './Financials';
 
@@ -19,10 +21,12 @@ interface AdminPanelProps {
   currentDriver: Driver | null;
 }
 
-type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'fares' | 'financials';
+type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'admins' | 'fares' | 'financials';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, drivers, fareRules, onSaveDrivers, onSavePassengers, onSaveFareRules, onExitAdminPanel, currentDriver }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+
+  const isAdmin = currentDriver?.role === 'admin';
 
   const renderContent = () => {
     switch (activeTab) {
@@ -33,10 +37,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
       case 'passengers':
         return <ManagePassengers passengers={passengers} onSave={onSavePassengers} />;
       case 'drivers':
-        // FIX: Changed onSave to onSaveDrivers to pass the correct prop.
-        return <ManageDrivers drivers={drivers} onSave={onSaveDrivers} />;
+        return isAdmin ? <ManageDrivers drivers={drivers} onSave={onSaveDrivers} /> : <div className="text-center text-gray-400 mt-10">Acesso restrito a administradores.</div>;
+      case 'admins':
+        return isAdmin ? <ManageAdmins drivers={drivers} onSave={onSaveDrivers} currentDriverId={currentDriver?.id || ''} /> : null;
       case 'fares':
-        return <ManageFares fareRules={fareRules} onSave={onSaveFareRules} />;
+        return isAdmin ? <ManageFares fareRules={fareRules} onSave={onSaveFareRules} /> : <div className="text-center text-gray-400 mt-10">Acesso restrito a administradores.</div>;
       case 'financials':
         return <Financials rideHistory={rideHistory} drivers={drivers} currentDriver={currentDriver} />;
       default:
@@ -60,12 +65,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
   return (
     <div className="bg-gray-800 h-full flex flex-col">
       <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h2 className="text-xl font-bold text-white">Painel Administrativo</h2>
+        <h2 className="text-xl font-bold text-white">Painel {isAdmin ? 'Administrativo' : 'do Motorista'}</h2>
         <button
           onClick={onExitAdminPanel}
-          className="bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg text-sm hover:bg-orange-600 transition-colors"
+          className="bg-gray-700 text-gray-300 hover:text-white border border-gray-600 hover:bg-gray-600 font-semibold py-2 px-4 rounded-lg text-sm transition-colors flex items-center"
+          title="Ir para tela de corrida"
         >
-          Voltar ao App
+          <i className="fa-solid fa-car-side mr-2"></i>
+          Testar Corrida
         </button>
       </div>
       
@@ -75,8 +82,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
           <TabButton tab="financials" label="Financeiro" />
           <TabButton tab="history" label="Corridas" />
           <TabButton tab="passengers" label="Passageiros" />
-          <TabButton tab="drivers" label="Motoristas" />
-          <TabButton tab="fares" label="Tarifas" />
+          
+          {/* Tabs visible only to Admins */}
+          {isAdmin && (
+            <>
+              <TabButton tab="drivers" label="Motoristas" />
+              <TabButton tab="admins" label="Admins" />
+              <TabButton tab="fares" label="Tarifas" />
+            </>
+          )}
         </div>
       </div>
       

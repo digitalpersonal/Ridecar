@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Passenger, AddressSuggestion, Driver, GeolocationCoordinates, FareRule } from '../types';
 import { useDebounce } from '../hooks/useDebounce';
@@ -5,6 +6,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { geocodeAddress } from '../services/geocodingService';
 import { RideCarLogo, UserIcon, WhatsAppIcon, IdCardIcon, PinIcon } from './icons';
 import Map from './Map';
+import Footer from './Footer';
 
 interface StartRideFormProps {
   savedPassengers: Passenger[];
@@ -58,15 +60,12 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     );
 
     if (matchedPassenger) {
-      // Encontrou um passageiro correspondente, preenche os outros campos
-      // mantendo o nome exato que o usuário digitou para evitar saltos de maiúsculas/minúsculas.
       setPassenger({
         name: newName,
         whatsapp: matchedPassenger.whatsapp,
         cpf: matchedPassenger.cpf || '',
       });
     } else {
-      // Nenhum passageiro correspondente, atualiza apenas o nome e limpa os outros campos.
       setPassenger({ name: newName, whatsapp: '', cpf: '' });
     }
   };
@@ -105,26 +104,22 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     }
 
     return (
-      <div className="bg-gray-700/80 rounded-lg p-4 mb-4 backdrop-blur-sm">
-        <h3 className="font-bold text-white mb-2 text-center">Ponto de Partida</h3>
-        <div className="relative h-40 w-full rounded-md overflow-hidden bg-gray-800 flex items-center justify-center">
+      <div className="bg-gray-700/80 rounded-lg p-4 mb-4 backdrop-blur-sm border border-gray-600">
+        <h3 className="font-bold text-white mb-2 text-center text-sm uppercase tracking-wider">Localização Atual</h3>
+        <div className="relative h-40 w-full rounded-md overflow-hidden bg-gray-800 flex items-center justify-center border border-gray-600">
           {isLocationLoading ? (
              <div className="text-center text-gray-400">
                <i className="fa-solid fa-spinner fa-spin text-2xl mb-2"></i>
-               <p>Obtendo localização GPS...</p>
+               <p>Obtendo GPS...</p>
              </div>
           ) : location ? (
             <>
               <Map location={location} isLoading={isLocationLoading} />
-              <div className="absolute bottom-2 left-2 bg-gray-900/70 p-2 rounded-md text-xs">
-                <p className="text-white font-mono">Lat: {location.latitude.toFixed(4)}</p>
-                <p className="text-white font-mono">Lon: {location.longitude.toFixed(4)}</p>
-              </div>
             </>
           ) : (
             <div className="text-center text-gray-500 px-4">
               <i className="fa-solid fa-satellite-dish text-2xl mb-2"></i>
-              <p>Aguardando sinal do GPS...</p>
+              <p>Aguardando sinal...</p>
             </div>
           )}
         </div>
@@ -133,79 +128,76 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
   };
 
   return (
-    <div className="h-full flex flex-col">
-       <div className="p-4 border-b border-white/20 flex justify-between items-center flex-shrink-0">
-        <div className="text-sm">
-            <span className="text-gray-400">Motorista: </span>
-            <span className="font-bold text-white">{currentDriver.name}</span>
+    <div className="h-full flex flex-col bg-gray-900">
+       <div className="p-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center flex-shrink-0 shadow-md z-20">
+        <div className="flex items-center">
+            <RideCarLogo className="h-8 w-auto text-orange-500 mr-3" />
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center">
+             <div className="text-right mr-3 hidden xs:block">
+                <p className="text-xs text-gray-400">Motorista</p>
+                <p className="text-sm font-bold text-white leading-tight">{currentDriver.name}</p>
+            </div>
             <button
                 onClick={onLogout}
-                className="text-gray-300 hover:text-white text-xs font-semibold px-2"
+                className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-700 transition-colors"
                 title="Sair da conta"
             >
-                Sair
-            </button>
-            <span className="text-gray-600">|</span>
-            <button 
-                onClick={onNavigateToAdmin}
-                className="bg-gray-700/50 text-orange-400 font-semibold py-2 px-3 rounded-lg text-sm hover:bg-gray-600/50 transition-colors backdrop-blur-sm"
-            >
-                Admin
+                <i className="fa-solid fa-right-from-bracket text-lg"></i>
             </button>
         </div>
       </div>
-      <div className="flex-grow p-6 overflow-y-auto">
-        <div className="flex justify-center mb-6">
-            <RideCarLogo className="h-10 w-auto text-orange-500" />
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4 pb-24">
+
+      <div className="flex-grow p-4 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="space-y-4 max-w-lg mx-auto">
           <LocationStatus />
-          {/* PASSENGER INFO */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <UserIcon className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Nome do Passageiro"
-              value={passenger.name}
-              onChange={handleNameChange}
-              onFocus={handleInputFocus}
-              className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 backdrop-blur-sm"
-              autoComplete="off"
-            />
+          
+          <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700 space-y-4">
+              <h3 className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-2">Dados do Passageiro</h3>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <UserIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Nome do Passageiro"
+                  value={passenger.name}
+                  onChange={handleNameChange}
+                  onFocus={handleInputFocus}
+                  className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 backdrop-blur-sm border border-gray-600"
+                  autoComplete="off"
+                />
+              </div>
+               <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <WhatsAppIcon className="text-lg text-gray-400" />
+                </div>
+                <input
+                  type="tel"
+                  placeholder="WhatsApp (Ex: 11987654321)"
+                  value={passenger.whatsapp}
+                  onChange={(e) => setPassenger(prev => ({ ...prev, whatsapp: e.target.value }))}
+                  onFocus={handleInputFocus}
+                  className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 backdrop-blur-sm border border-gray-600"
+                />
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <IdCardIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="CPF (Opcional)"
+                  value={passenger.cpf || ''}
+                  onChange={(e) => setPassenger(prev => ({ ...prev, cpf: e.target.value }))}
+                  onFocus={handleInputFocus}
+                  className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 backdrop-blur-sm border border-gray-600"
+                />
+              </div>
           </div>
-           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <WhatsAppIcon className="text-lg text-gray-400" />
-            </div>
-            <input
-              type="tel"
-              placeholder="WhatsApp (Ex: 11987654321)"
-              value={passenger.whatsapp}
-              onChange={(e) => setPassenger(prev => ({ ...prev, whatsapp: e.target.value }))}
-              onFocus={handleInputFocus}
-              className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 backdrop-blur-sm"
-            />
-          </div>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <IdCardIcon className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="CPF (Opcional)"
-              value={passenger.cpf || ''}
-              onChange={(e) => setPassenger(prev => ({ ...prev, cpf: e.target.value }))}
-              onFocus={handleInputFocus}
-              className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 backdrop-blur-sm"
-            />
-          </div>
-          {/* DESTINATION INFO */}
-          <div className="bg-gray-700/80 p-4 rounded-lg space-y-4 backdrop-blur-sm">
-            <h3 className="font-bold text-white text-center">Destino da Viagem</h3>
+
+          <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700 space-y-4">
+            <h3 className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-2">Destino e Tarifa</h3>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <i className="fa-solid fa-city text-gray-400"></i>
@@ -214,9 +206,9 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                 value={destinationCity}
                 onChange={(e) => setDestinationCity(e.target.value)}
                 onFocus={handleInputFocus}
-                className="bg-gray-600 p-3 pl-10 w-full text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none"
+                className="bg-gray-700/80 p-3 pl-10 w-full text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none border border-gray-600"
               >
-                <option value="">Selecione a cidade de destino</option>
+                <option value="">Selecione a cidade...</option>
                 {availableDestinations.map(rule => (
                   <option key={rule.id} value={rule.destinationCity}>{rule.destinationCity}</option>
                 ))}
@@ -229,27 +221,27 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
               </div>
               <input
                 type="text"
-                placeholder="Endereço de destino"
+                placeholder="Endereço (Rua e Número)"
                 value={destinationAddress}
                 onChange={(e) => setDestinationAddress(e.target.value)}
                 onFocus={handleInputFocus}
-                className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 border border-gray-600"
                 autoComplete="off"
                 disabled={!destinationCity}
               />
               {destSuggestions.length > 0 && (
-                <ul className="absolute z-20 w-full mt-1 bg-gray-500/95 rounded-lg shadow-xl max-h-40 overflow-y-auto backdrop-blur-sm">
+                <ul className="absolute z-20 w-full mt-1 bg-gray-700 rounded-lg shadow-xl max-h-40 overflow-y-auto border border-gray-600">
                   {destSuggestions.map((s, i) => (
-                    <li key={i} onClick={() => handleDestSuggestionClick(s)} className="px-4 py-3 text-white cursor-pointer hover:bg-gray-400/80">{s.description}</li>
+                    <li key={i} onClick={() => handleDestSuggestionClick(s)} className="px-4 py-3 text-white cursor-pointer hover:bg-gray-600 border-b border-gray-600 last:border-0">{s.description}</li>
                   ))}
                 </ul>
               )}
             </div>
             
             {currentFareRule && (
-              <div className="text-center bg-gray-800 p-3 rounded-lg">
-                <p className="text-sm text-gray-300">Valor da corrida</p>
-                <p className="text-3xl font-bold text-orange-400">R$ {currentFareRule.fare.toFixed(2)}</p>
+              <div className="flex items-center justify-between bg-gray-900/50 p-4 rounded-lg border border-orange-500/30">
+                <span className="text-gray-300 font-medium">Valor Estimado</span>
+                <span className="text-2xl font-bold text-orange-400">R$ {currentFareRule.fare.toFixed(2)}</span>
               </div>
             )}
           </div>
@@ -257,11 +249,27 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
           <button
             type="submit"
             disabled={!isFormValid}
-            className="w-full bg-orange-500 text-white font-bold py-3 px-4 rounded-lg disabled:bg-gray-600/50 disabled:cursor-not-allowed transition-all hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-orange-500 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50"
+            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-4 px-4 rounded-xl disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed transition-all hover:from-orange-600 hover:to-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-orange-500 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transform active:scale-95"
           >
-            {isLocationLoading ? 'Aguardando GPS...' : !location ? 'Localização Indisponível' : 'Iniciar Viagem'}
+            {isLocationLoading ? 'Carregando GPS...' : !location ? 'Sem GPS' : 'INICIAR CORRIDA'}
           </button>
         </form>
+      </div>
+
+      <div className="bg-gray-900">
+          {/* Admin shortcut ONLY for Admins */}
+          {currentDriver.role === 'admin' && (
+              <div className="flex justify-center py-2 border-t border-gray-800">
+                  <button 
+                      onClick={onNavigateToAdmin}
+                      className="text-xs text-gray-500 hover:text-orange-500 transition-colors flex items-center"
+                  >
+                      <i className="fa-solid fa-lock mr-1"></i>
+                      Voltar ao Painel Admin
+                  </button>
+              </div>
+          )}
+          <Footer />
       </div>
     </div>
   );

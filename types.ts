@@ -1,3 +1,4 @@
+
 export enum AppState {
   START,
   IN_RIDE,
@@ -5,6 +6,7 @@ export enum AppState {
 }
 
 export interface Passenger {
+  id?: number | string; // Supabase uses numeric ID for passengers in our schema, but string compat is good
   name: string;
   cpf?: string;
   whatsapp: string;
@@ -16,6 +18,7 @@ export interface GeolocationCoordinates {
 }
 
 export interface Ride {
+  id?: string; // UUID from DB
   passenger: Passenger;
   destination: {
     address: string;
@@ -41,6 +44,7 @@ export interface Driver {
   carModel: string;
   licensePlate: string;
   city: string;
+  role?: 'admin' | 'driver'; // New field for RBAC
 }
 
 export interface FareRule {

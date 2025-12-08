@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppState } from './types';
 import type { Passenger, Ride, Driver, GeolocationCoordinates, FareRule } from './types';
@@ -5,38 +6,57 @@ import StartRideForm from './components/StartRideForm';
 import InRideDisplay from './components/InRideDisplay';
 import AdminPanel from './components/admin/AdminPanel';
 import LoginScreen from './components/LoginScreen';
+import { supabase } from './supabaseClient';
 
-const PASSENGERS_STORAGE_KEY = 'ridecar_saved_passengers';
-const RIDE_HISTORY_STORAGE_KEY = 'ridecar_ride_history';
 const APP_STATE_STORAGE_KEY = 'ridecar_app_state';
 const CURRENT_RIDE_STORAGE_KEY = 'ridecar_current_ride';
-const DRIVERS_STORAGE_KEY = 'ridecar_drivers_list';
 const CURRENT_DRIVER_STORAGE_KEY = 'ridecar_current_driver';
-const FARE_RULES_STORAGE_KEY = 'ridecar_fare_rules';
 
+// Dados de fallback caso o Supabase falhe ou esteja vazio
+const DEMO_ADMIN: Driver = {
+  id: 'admin_master',
+  name: 'Administrador Master',
+  email: 'ridecar@digitalfreeshop.com.br',
+  password: 'Mld3602#?+',
+  carModel: 'Escritório',
+  licensePlate: 'ADM-001',
+  city: 'Matriz',
+  role: 'admin'
+};
+
+const DEMO_DRIVER: Driver = {
+  id: 'driver_demo',
+  name: 'Carlos Silva',
+  email: 'carlos@ridecar.com',
+  password: '123',
+  carModel: 'Toyota Corolla',
+  licensePlate: 'BRA2E19',
+  city: 'Guaxupé',
+  role: 'driver'
+};
+
+const DEMO_FARES: FareRule[] = [
+  { id: 'f1', destinationCity: 'Guaxupé', fare: 35.00 },
+  { id: 'f2', destinationCity: 'Guaranésia', fare: 12.00 }
+];
 
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.START);
   const [currentRide, setCurrentRide] = useState<Ride | null>(null);
+  
+  // Data fetched from Supabase
   const [savedPassengers, setSavedPassengers] = useState<Passenger[]>([]);
   const [rideHistory, setRideHistory] = useState<Ride[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [currentDriver, setCurrentDriver] = useState<Driver | null>(null);
   const [fareRules, setFareRules] = useState<FareRule[]>([]);
+  
+  const [currentDriver, setCurrentDriver] = useState<Driver | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
+  // Load basic local state (session persistence) and fetch initial data
   useEffect(() => {
-    try {
-      // Load saved passengers
-      const storedPassengers = localStorage.getItem(PASSENGERS_STORAGE_KEY);
-      if (storedPassengers) {
-        setSavedPassengers(JSON.parse(storedPassengers));
-      }
-      // Load ride history
-      const storedHistory = localStorage.getItem(RIDE_HISTORY_STORAGE_KEY);
-      if (storedHistory) {
-        setRideHistory(JSON.parse(storedHistory));
-      }
-      // Load persisted app state
+    const initializeApp = async () => {
+      // Restore session state
       const storedAppState = localStorage.getItem(APP_STATE_STORAGE_KEY);
       if (storedAppState) {
         const parsedState = JSON.parse(storedAppState) as AppState;
@@ -44,102 +64,196 @@ function App() {
           setAppState(parsedState);
         }
       }
-      // Load persisted current ride
+
       const storedRide = localStorage.getItem(CURRENT_RIDE_STORAGE_KEY);
       if (storedRide) {
         setCurrentRide(JSON.parse(storedRide));
+        setAppState(AppState.IN_RIDE); // Force ride state if ride exists locally
       }
-      // Load drivers
-      const storedDrivers = localStorage.getItem(DRIVERS_STORAGE_KEY);
-      if (storedDrivers) {
-        setDrivers(JSON.parse(storedDrivers));
-      } else {
-        const defaultDriver: Driver = {
-          id: 'driver_1',
-          name: 'Carlos Silva',
-          email: 'carlos@ridecar.com',
-          password: '123',
-          carModel: 'Toyota Corolla',
-          licensePlate: 'BRA2E19',
-          city: 'São Paulo',
-        };
-        setDrivers([defaultDriver]);
-      }
-      // Load current driver
+
       const storedCurrentDriver = localStorage.getItem(CURRENT_DRIVER_STORAGE_KEY);
       if (storedCurrentDriver) {
         setCurrentDriver(JSON.parse(storedCurrentDriver));
       }
-      // Load fare rules with enforced updates for Guaranésia and Guaxupé
-      const storedFareRules = localStorage.getItem(FARE_RULES_STORAGE_KEY);
-      let rules: FareRule[] = [];
 
-      if (storedFareRules) {
-          rules = JSON.parse(storedFareRules);
-      }
+      // Fetch Global Data
+      await fetchAllData();
+    };
 
-      // Update or Add Guaranésia (R$ 12.00)
-      const gIdx = rules.findIndex(r => r.destinationCity === 'Guaranésia');
-      if (gIdx !== -1) {
-         rules[gIdx].fare = 12.00;
-      } else {
-         rules.push({ id: 'rule_guaranesia', destinationCity: 'Guaranésia', fare: 12.00 });
-      }
-
-      // Update or Add Guaxupé (R$ 35.00)
-      const gxIdx = rules.findIndex(r => r.destinationCity === 'Guaxupé');
-      if (gxIdx !== -1) {
-         rules[gxIdx].fare = 35.00;
-      } else {
-         rules.push({ id: 'rule_guaxupe', destinationCity: 'Guaxupé', fare: 35.00 });
-      }
-
-      setFareRules(rules);
-
-    } catch (error) {
-      console.error("Falha ao carregar dados do armazenamento", error);
-    }
+    initializeApp();
   }, []);
 
-  // Save state to localStorage
-  useEffect(() => {
+  const fetchAllData = async () => {
+    setIsLoadingData(true);
     try {
-      localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(appState));
-      if (currentRide) {
-        localStorage.setItem(CURRENT_RIDE_STORAGE_KEY, JSON.stringify(currentRide));
+      // 1. Fetch Fare Rules
+      const { data: fares, error: fareError } = await supabase.from('fare_rules').select('*');
+      if (fares && fares.length > 0) {
+        setFareRules(fares.map((f: any) => ({
+          id: f.id,
+          destinationCity: f.destination_city,
+          fare: f.fare
+        })));
       } else {
-        localStorage.removeItem(CURRENT_RIDE_STORAGE_KEY);
+        // Fallback fares if DB is empty or error
+        setFareRules(DEMO_FARES);
       }
-      localStorage.setItem(DRIVERS_STORAGE_KEY, JSON.stringify(drivers));
-      if (currentDriver) {
-        localStorage.setItem(CURRENT_DRIVER_STORAGE_KEY, JSON.stringify(currentDriver));
-      } else {
-        localStorage.removeItem(CURRENT_DRIVER_STORAGE_KEY);
-      }
-      localStorage.setItem(FARE_RULES_STORAGE_KEY, JSON.stringify(fareRules));
-    } catch (error) {
-      console.error("Falha ao salvar o estado da aplicação", error);
-    }
-  }, [appState, currentRide, drivers, currentDriver, fareRules]);
 
-  const handleSavePassengers = (updatedPassengers: Passenger[]) => {
-    setSavedPassengers(updatedPassengers);
-    localStorage.setItem(PASSENGERS_STORAGE_KEY, JSON.stringify(updatedPassengers));
+      // 2. Fetch Drivers (and Admins)
+      const { data: dbDrivers, error: driverError } = await supabase.from('drivers').select('*');
+      
+      let loadedDrivers: Driver[] = [];
+      if (dbDrivers && dbDrivers.length > 0) {
+        loadedDrivers = dbDrivers.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          password: d.password,
+          carModel: d.car_model,
+          licensePlate: d.license_plate,
+          city: d.city,
+          role: d.role || 'driver' // Default to driver if null
+        }));
+      }
+      
+      // Ensure we always have the fallbacks locally if none found
+      // This ensures the Admin credentials works even if DB is empty
+      const hasAdmin = loadedDrivers.some(d => d.role === 'admin');
+      const hasDemoDriver = loadedDrivers.some(d => d.email === DEMO_DRIVER.email);
+
+      if (!hasAdmin) loadedDrivers.push(DEMO_ADMIN);
+      if (!hasDemoDriver) loadedDrivers.push(DEMO_DRIVER);
+
+      setDrivers(loadedDrivers);
+
+
+      // 3. Fetch Passengers
+      const { data: dbPassengers } = await supabase.from('passengers').select('*');
+      if (dbPassengers) setSavedPassengers(dbPassengers);
+
+      // 4. Fetch Ride History
+      const { data: dbRides } = await supabase.from('rides').select('*').order('created_at', { ascending: false }).limit(100);
+      
+      if (dbRides) {
+        const mappedRides: Ride[] = dbRides.map((r: any) => ({
+          id: r.id,
+          driverId: r.driver_id,
+          passenger: r.passenger_json,
+          destination: r.destination_json,
+          startTime: r.start_time,
+          endTime: r.end_time,
+          distance: r.distance,
+          fare: r.fare,
+          startLocation: r.start_location_json
+        }));
+        setRideHistory(mappedRides);
+      }
+
+    } catch (error) {
+      console.error("Erro ao buscar dados do Supabase:", error);
+      // Ensure app is usable even offline
+      setDrivers([DEMO_ADMIN, DEMO_DRIVER]);
+      setFareRules(DEMO_FARES);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  // Persist local session state only
+  useEffect(() => {
+    localStorage.setItem(APP_STATE_STORAGE_KEY, JSON.stringify(appState));
+    if (currentRide) {
+      localStorage.setItem(CURRENT_RIDE_STORAGE_KEY, JSON.stringify(currentRide));
+    } else {
+      localStorage.removeItem(CURRENT_RIDE_STORAGE_KEY);
+    }
+    if (currentDriver) {
+      localStorage.setItem(CURRENT_DRIVER_STORAGE_KEY, JSON.stringify(currentDriver));
+    } else {
+      localStorage.removeItem(CURRENT_DRIVER_STORAGE_KEY);
+    }
+  }, [appState, currentRide, currentDriver]);
+
+
+  // --- Handlers for Admin/State Sync ---
+
+  const handleSavePassengers = async (updatedPassengers: Passenger[]) => {
+    await fetchAllData();
   };
   
-  const handleSaveDrivers = (updatedDrivers: Driver[]) => {
-    setDrivers(updatedDrivers);
+  const handleSaveDrivers = async (updatedDrivers: Driver[]) => {
+    // This handler now handles both Admins and Drivers since they are in the same list
+    const currentIds = drivers.map(d => d.id);
+    const newIds = updatedDrivers.map(d => d.id);
+    // Don't delete demo accounts locally, but allow DB sync
+    const toDelete = currentIds.filter(id => !newIds.includes(id) && id !== 'driver_demo' && id !== 'admin_master'); 
+    const toUpsert = updatedDrivers.filter(d => d.id !== 'driver_demo' && d.id !== 'admin_master');
+
+    try {
+      if (toDelete.length > 0) {
+        await supabase.from('drivers').delete().in('id', toDelete);
+      }
+
+      if (toUpsert.length > 0) {
+        const dbRows = toUpsert.map(d => ({
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          password: d.password,
+          car_model: d.carModel,
+          license_plate: d.licensePlate,
+          city: d.city,
+          role: d.role // Important: Save the role
+        }));
+        await supabase.from('drivers').upsert(dbRows);
+      }
+      
+      // Update local state immediately for UI responsiveness
+      setDrivers(updatedDrivers);
+    } catch (e) {
+      console.error("Error saving drivers:", e);
+      alert("Erro ao salvar dados. Verifique a conexão.");
+    }
   };
   
-  const handleSaveFareRules = (updatedFareRules: FareRule[]) => {
-    setFareRules(updatedFareRules);
+  const handleSaveFareRules = async (updatedFareRules: FareRule[]) => {
+    const currentIds = fareRules.map(r => r.id);
+    const newIds = updatedFareRules.map(r => r.id);
+    const toDelete = currentIds.filter(id => !newIds.includes(id) && !id.startsWith('f')); // Avoid deleting demo data
+    const toUpsert = updatedFareRules.filter(r => !r.id.startsWith('f')); // Avoid upserting demo data
+    
+    try {
+      if (toDelete.length > 0) {
+        await supabase.from('fare_rules').delete().in('id', toDelete);
+      }
+
+      if (toUpsert.length > 0) {
+        const dbRows = toUpsert.map(r => ({
+            id: r.id,
+            destination_city: r.destinationCity,
+            fare: r.fare
+        }));
+        await supabase.from('fare_rules').upsert(dbRows);
+      }
+
+      setFareRules(updatedFareRules);
+    } catch (e) {
+      console.error("Error saving fares:", e);
+      alert("Erro ao salvar tarifas.");
+    }
   };
 
   const handleLogin = (email: string, password: string): boolean => {
+    // Verify against loaded drivers
     const driver = drivers.find(d => d.email.toLowerCase() === email.toLowerCase() && d.password === password);
     if (driver) {
       setCurrentDriver(driver);
-      setAppState(AppState.START);
+      // Auto-redirect based on role
+      if (driver.role === 'admin') {
+        setAppState(AppState.ADMIN_PANEL);
+      } else {
+        setAppState(AppState.START);
+      }
       return true;
     }
     return false;
@@ -147,74 +261,182 @@ function App() {
   
   const handleLogout = () => {
     setCurrentDriver(null);
-    setAppState(AppState.START); // Will redirect to LoginScreen as currentDriver is null
+    setAppState(AppState.START);
+    // Clear persisted driver to prevent auto-relogin issues
+    localStorage.removeItem(CURRENT_DRIVER_STORAGE_KEY);
   };
 
-  const handleStartRide = (passenger: Passenger, destination: { address: string; city: string }, startLocation: GeolocationCoordinates | null, fare: number) => {
+  const handleStartRide = async (passenger: Passenger, destination: { address: string; city: string }, startLocation: GeolocationCoordinates | null, fare: number) => {
     if (!currentDriver || !startLocation) return;
-    const newRide: Ride = {
+    
+    // 1. Prepare initial Ride object
+    const tempRide: Ride = {
       passenger,
       destination,
       startTime: Date.now(),
       distance: 0,
-      fare, // Use fixed fare
+      fare,
       driverId: currentDriver.id,
       startLocation,
     };
-    setCurrentRide(newRide);
-    setAppState(AppState.IN_RIDE);
+
+    try {
+      // 2. Save/Update passenger in DB (upsert by whatsapp)
+      const { data: savedPassengerData } = await supabase.from('passengers').upsert({
+        name: passenger.name,
+        whatsapp: passenger.whatsapp,
+        cpf: passenger.cpf
+      }, { onConflict: 'whatsapp' }).select().single();
+
+      if (savedPassengerData) {
+        tempRide.passenger = { ...passenger, id: savedPassengerData.id };
+      }
+
+      // 3. Insert Ride into DB
+      const dbRide = {
+        driver_id: currentDriver.id,
+        passenger_json: tempRide.passenger,
+        destination_json: destination,
+        start_time: tempRide.startTime,
+        start_location_json: startLocation,
+        fare: fare,
+        distance: 0
+      };
+
+      const { data: insertedRide, error } = await supabase.from('rides').insert(dbRide).select().single();
+
+      if (error) throw error;
+
+      if (insertedRide) {
+        // Update local state with the DB ID
+        const finalRide = { ...tempRide, id: insertedRide.id };
+        setCurrentRide(finalRide);
+        setAppState(AppState.IN_RIDE);
+        
+        // Refresh passenger list in background
+        fetchAllData(); 
+      }
+    } catch (e) {
+      console.error("Error starting ride:", e);
+      // Fallback for offline (optional: you could allow offline start here)
+      // Allow starting ride locally even if DB fails
+      setCurrentRide(tempRide);
+      setAppState(AppState.IN_RIDE);
+    }
   };
 
-  const handleStopRide = (finalDistance: number) => {
-    if (!currentRide) return;
+  const handleStopRide = async (finalDistance: number) => {
+    if (currentRide) {
+      const endTime = Date.now();
+      
+      try {
+        if (currentRide.id) {
+            // Update DB
+            const { error } = await supabase.from('rides').update({
+            end_time: endTime,
+            distance: finalDistance,
+            }).eq('id', currentRide.id);
 
-    const endTime = Date.now();
+            if (error) throw error;
+        }
+
+        // Update Local
+        const updatedRide = { ...currentRide, distance: finalDistance, endTime };
+        setCurrentRide(updatedRide);
+
+        // Update History Local
+        setRideHistory(prev => [updatedRide, ...prev]);
+      } catch (e) {
+        console.error("Error stopping ride:", e);
+        // Still update UI to show completion even if sync failed
+        const updatedRide = { ...currentRide, distance: finalDistance, endTime };
+        setCurrentRide(updatedRide);
+        setRideHistory(prev => [updatedRide, ...prev]);
+      }
+    }
+  };
+  
+  const handleUpdateDestination = async (newDestination: { address: string; city: string }) => {
+    if (!currentRide) return;
     
-    const finishedRide: Ride = {
-      ...currentRide,
-      endTime,
-      distance: finalDistance,
-      // Fare is already fixed, no need to recalculate
-    };
-    setCurrentRide(finishedRide);
+    // Update local state
+    const updatedRide = { ...currentRide, destination: newDestination };
+    setCurrentRide(updatedRide);
+
+    // Update DB
+    if (updatedRide.id) {
+        try {
+            await supabase.from('rides').update({
+                destination_json: newDestination
+            }).eq('id', updatedRide.id);
+        } catch (e) {
+            console.error("Error updating destination:", e);
+        }
+    }
   };
 
   const handleSendWhatsApp = () => {
-    if (!currentRide) return;
-    const { passenger, fare } = currentRide;
-    const message = `Olá ${passenger.name}! O valor da sua corrida de ${currentDriver?.city} para ${currentRide.destination.city} foi de R$${fare.toFixed(2)}. Meu PIX para pagamento é: [SUA CHAVE PIX AQUI]`;
-    const whatsappUrl = `https://wa.me/55${passenger.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-  };
-
-  const handleCompleteAndReset = () => {
-    if (!currentRide) return;
-
-    const { passenger } = currentRide;
-    if (passenger.name && passenger.whatsapp) {
-      const updatedPassengers = [...savedPassengers];
-      const existingIndex = updatedPassengers.findIndex(p => p.name.toLowerCase() === passenger.name.toLowerCase());
+    if (currentRide && currentDriver) {
+      const message = `Olá ${currentRide.passenger.name}, sua corrida com ${currentDriver.name} foi finalizada.\n\n` +
+        `*Destino:* ${currentRide.destination.address}\n` +
+        `*Distância:* ${currentRide.distance.toFixed(2)} km\n` +
+        `*Total a pagar:* R$ ${currentRide.fare.toFixed(2)}\n\n` +
+        `Chave PIX: ${currentDriver.email}\n` + 
+        `Obrigado pela preferência!`;
       
-      if (existingIndex !== -1) {
-        updatedPassengers[existingIndex] = passenger;
-      } else {
-        updatedPassengers.push(passenger);
-      }
-      
-      handleSavePassengers(updatedPassengers);
+      const encodedMessage = encodeURIComponent(message);
+      window.open(`https://wa.me/55${currentRide.passenger.whatsapp}?text=${encodedMessage}`, '_blank');
     }
-
-    const newHistory = [...rideHistory, currentRide];
-    setRideHistory(newHistory);
-    localStorage.setItem(RIDE_HISTORY_STORAGE_KEY, JSON.stringify(newHistory));
-
-    setAppState(AppState.START);
-    setCurrentRide(null);
   };
-  
-  const renderContent = () => {
-    if (appState === AppState.ADMIN_PANEL) {
+
+  const handleCompleteRide = () => {
+    setCurrentRide(null);
+    setAppState(AppState.START);
+    // Refresh history
+    fetchAllData();
+  };
+
+  if (isLoadingData && !drivers.length) {
       return (
+          <div className="h-full w-full bg-gray-900 flex items-center justify-center text-white">
+              <div className="text-center">
+                <i className="fa-solid fa-spinner fa-spin text-4xl mb-4 text-orange-500"></i>
+                <p>Carregando sistema...</p>
+              </div>
+          </div>
+      )
+  }
+
+  if (!currentDriver) {
+    return <LoginScreen onLogin={handleLogin} onNavigateToAdmin={() => setAppState(AppState.ADMIN_PANEL)} />;
+  }
+
+  return (
+    <div className="h-full w-full bg-gray-900 text-white overflow-hidden font-sans flex flex-col">
+      {appState === AppState.START && (
+        <StartRideForm 
+          savedPassengers={savedPassengers}
+          onStartRide={handleStartRide}
+          onNavigateToAdmin={() => setAppState(AppState.ADMIN_PANEL)}
+          currentDriver={currentDriver}
+          onLogout={handleLogout}
+          fareRules={fareRules}
+        />
+      )}
+
+      {appState === AppState.IN_RIDE && currentRide && (
+        <InRideDisplay 
+          ride={currentRide}
+          driver={currentDriver}
+          onStopRide={handleStopRide}
+          onSendWhatsApp={handleSendWhatsApp}
+          onComplete={handleCompleteRide}
+          onUpdateDestination={handleUpdateDestination}
+          fareRules={fareRules}
+        />
+      )}
+
+      {appState === AppState.ADMIN_PANEL && (
         <AdminPanel 
           rideHistory={rideHistory}
           passengers={savedPassengers}
@@ -226,60 +448,7 @@ function App() {
           onExitAdminPanel={() => setAppState(AppState.START)}
           currentDriver={currentDriver}
         />
-      );
-    }
-
-    if (!currentDriver) {
-      return (
-        <div className="relative h-full w-full">
-            <div 
-              className="absolute inset-0 bg-cover bg-center" 
-              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?q=80&w=2071&auto=format&fit=crop')" }}
-              aria-hidden="true"
-            >
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-            </div>
-            <div className="absolute inset-0 overflow-y-auto">
-              <LoginScreen
-                onLogin={handleLogin}
-                onNavigateToAdmin={() => setAppState(AppState.ADMIN_PANEL)}
-              />
-            </div>
-        </div>
-      );
-    }
-
-    switch (appState) {
-      case AppState.START:
-        return <StartRideForm 
-                  onStartRide={handleStartRide} 
-                  savedPassengers={savedPassengers} 
-                  onNavigateToAdmin={() => setAppState(AppState.ADMIN_PANEL)}
-                  currentDriver={currentDriver}
-                  onLogout={handleLogout}
-                  fareRules={fareRules}
-                />;
-      case AppState.IN_RIDE:
-        return (
-          <InRideDisplay 
-            ride={currentRide!}
-            driver={currentDriver}
-            onStopRide={handleStopRide}
-            onSendWhatsApp={handleSendWhatsApp}
-            onComplete={handleCompleteAndReset}
-          />
-        );
-      default:
-        handleLogout();
-        return null;
-    }
-  };
-
-  return (
-    <div className="h-screen w-screen bg-black text-white flex flex-col font-sans">
-      <div className="relative flex-grow">
-        {renderContent()}
-      </div>
+      )}
     </div>
   );
 }
