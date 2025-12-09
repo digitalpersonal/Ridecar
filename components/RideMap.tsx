@@ -1,8 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import ReactDOMServer from 'react-dom/server';
 import type { GeolocationCoordinates } from '../types';
-import { CarIcon } from './icons';
 
 declare const L: any; // Informa ao TypeScript sobre a variável global L do Leaflet
 
@@ -18,12 +16,19 @@ interface RideMapProps {
   driverName?: string;
 }
 
-const MapPinIcon: React.FC<{ icon: string; color: string }> = ({ icon, color }) => (
-  <div className="relative flex flex-col items-center">
-    <i className={`fa-solid ${icon} ${color} text-4xl drop-shadow-md`}></i>
-    <div className="w-3 h-3 bg-black/30 rounded-full -mt-1.5 blur-sm"></div>
+// Helpers para ícones SVG em String (Evita uso de ReactDOMServer que causa erro no browser)
+const getPinIconHtml = (iconClass: string, colorClass: string) => `
+  <div class="relative flex flex-col items-center" style="transform: translate(0, -50%);">
+    <i class="fa-solid ${iconClass} ${colorClass} text-4xl drop-shadow-md" style="font-size: 36px;"></i>
+    <div class="w-3 h-3 bg-black/30 rounded-full mt-[-2px] blur-sm"></div>
   </div>
-);
+`;
+
+const getCarIconHtml = (rotation: number) => `
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="text-orange-600 drop-shadow-md" style="width: 32px; height: 32px; transform: rotate(${rotation}deg); color: #ea580c; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">
+    <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z" />
+  </svg>
+`;
 
 // Função auxiliar para calcular distância em metros
 const getDistanceFromLatLonInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -59,11 +64,8 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
   const [lastRouteFetchLoc, setLastRouteFetchLoc] = useState<GeolocationCoordinates | null>(null);
 
   const getCarIcon = (rotation: number = 0) => {
-    const iconHTML = ReactDOMServer.renderToString(
-      <CarIcon className="h-8 w-8 text-orange-600 drop-shadow-md" style={{ transform: `rotate(${rotation}deg)` }}/>
-    );
     return L.divIcon({
-      html: iconHTML,
+      html: getCarIconHtml(rotation),
       className: '',
       iconSize: [32, 32],
       iconAnchor: [16, 16],
@@ -132,7 +134,7 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
       try {
         let data;
         
-        // Tentativa 1: Servidor OSRM Alemão
+        // Tentativa 1: Servidor OSRM Alemão (Geralmente mais estável e rápido para demos)
         try {
             data = await fetchFromUrl(
             `https://routing.openstreetmap.de/routed-car/route/v1/driving/${origin.longitude},${origin.latitude};${destinationCoords.longitude},${destinationCoords.latitude}?overview=full&geometries=geojson`
@@ -146,12 +148,12 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
         }
         
         if (data && data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
-        const geometry = route.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
-        setRoutePath(geometry);
-        setLastRouteFetchLoc(origin); // Atualiza a posição de referência
+            const route = data.routes[0];
+            const geometry = route.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            setRoutePath(geometry);
+            setLastRouteFetchLoc(origin); // Atualiza a posição de referência
         } else {
-            // Se não achou rota, não limpa a anterior imediatamente para evitar piscada, a menos que seja a primeira vez
+            // Se não achou rota, desenha linha reta no render (fallback visual)
             if (routePath.length === 0) setRoutePath([]);
         }
       } catch (error) {
@@ -161,7 +163,7 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
     };
 
     fetchRoute();
-  }, [currentLocation, destinationCoords]); // Removed startLocation dependency loop, relying on origin var
+  }, [currentLocation, destinationCoords]); // Removed startLocation dependency loop
 
 
   // Renderização do Mapa
@@ -177,9 +179,8 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
   
     // Marcador de Início
     if (startLocation) {
-      const startIconHTML = ReactDOMServer.renderToString(<MapPinIcon icon="fa-flag" color="text-green-600" />);
       const startIcon = L.divIcon({
-        html: startIconHTML,
+        html: getPinIconHtml('fa-flag', 'text-green-600'),
         className: '',
         iconSize: [40, 50],
         iconAnchor: [20, 50],
@@ -189,9 +190,8 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
   
     // Marcador de Destino
     if (destinationCoords) {
-      const destIconHTML = ReactDOMServer.renderToString(<MapPinIcon icon="fa-flag-checkered" color="text-red-600" />);
       const destIcon = L.divIcon({
-        html: destIconHTML,
+        html: getPinIconHtml('fa-flag-checkered', 'text-red-600'),
         className: '',
         iconSize: [40, 50],
         iconAnchor: [20, 50],
@@ -232,7 +232,7 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
             lineCap: 'round'
         }).addTo(map);
     } else if (origin && destinationCoords) {
-        // Fallback: Linha reta
+        // Fallback: Linha reta se não houver rota OSRM
         straightLineRef.current = L.polyline([
             [origin.latitude, origin.longitude],
             [destinationCoords.latitude, destinationCoords.longitude]
@@ -263,9 +263,10 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
       }
 
       if (routePath.length > 0) {
-          // Adiciona pontos da rota para garantir que curvas caibam na tela
-          // Simplificação: adiciona a cada 10 pontos para performance
-          for(let i=0; i<routePath.length; i+=10) {
+          // Adiciona pontos estratégicos da rota para garantir o zoom correto
+          // Início, meio e fim, mais alguns passos
+          const step = Math.max(1, Math.floor(routePath.length / 10));
+          for(let i=0; i<routePath.length; i+=step) {
               bounds.extend(routePath[i]);
           }
           bounds.extend(routePath[routePath.length-1]);

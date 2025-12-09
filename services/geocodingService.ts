@@ -12,13 +12,9 @@ export const geocodeAddress = async (query: string, city: string): Promise<Addre
     // Adiciona o contexto da cidade e país para melhorar a precisão
     const fullQuery = `${query}, ${city}, Brazil`;
     
+    // Removendo headers customizados para evitar problemas de CORS em alguns navegadores/proxies
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&addressdetails=1&limit=5&countrycodes=br`,
-      {
-         headers: {
-             'Accept-Language': 'pt-BR'
-         }
-      }
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&addressdetails=1&limit=5&countrycodes=br`
     );
     
     if (!response.ok) return [];
@@ -28,7 +24,6 @@ export const geocodeAddress = async (query: string, city: string): Promise<Addre
     // Mapeia os resultados do Nominatim para o formato do App
     return data.map((item: any) => {
         // Formata o endereço para ficar mais limpo
-        // O display_name do Nominatim é bem completo.
         const cleanName = item.display_name.split(', Brazil')[0];
         return {
             description: cleanName
@@ -50,13 +45,10 @@ export const getCoordinatesForAddress = async (
 ): Promise<GeolocationCoordinates | null> => {
   try {
     const fullQuery = `${address}, ${city}, Brazil`;
+    
+    // Removendo headers customizados para evitar problemas de CORS
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&limit=1&countrycodes=br`,
-       {
-         headers: {
-             'Accept-Language': 'pt-BR'
-         }
-      }
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&limit=1&countrycodes=br`
     );
 
     if (!response.ok) return null;

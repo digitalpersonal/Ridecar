@@ -37,20 +37,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
 
   const isAdmin = currentDriver?.role === 'admin';
 
+  // Se um usuário não-admin tentar acessar uma aba restrita, redireciona para financials
+  useEffect(() => {
+    if (!isAdmin && ['dashboard', 'drivers', 'admins', 'fares'].includes(activeTab)) {
+        setActiveTab('financials');
+    }
+  }, [isAdmin, activeTab]);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return isAdmin ? <Dashboard rideHistory={rideHistory} /> : <div className="text-center text-gray-400 mt-10">Acesso restrito.</div>;
+        return isAdmin ? <Dashboard rideHistory={rideHistory} /> : null;
       case 'history':
         return <RideHistory rideHistory={rideHistory} />;
       case 'passengers':
         return <ManagePassengers passengers={passengers} onSave={onSavePassengers} />;
       case 'drivers':
-        return isAdmin ? <ManageDrivers drivers={drivers} onSave={onSaveDrivers} /> : <div className="text-center text-gray-400 mt-10">Acesso restrito a administradores.</div>;
+        return isAdmin ? <ManageDrivers drivers={drivers} onSave={onSaveDrivers} /> : null;
       case 'admins':
         return isAdmin ? <ManageAdmins drivers={drivers} onSave={onSaveDrivers} currentDriverId={currentDriver?.id || ''} /> : null;
       case 'fares':
-        return isAdmin ? <ManageFares fareRules={fareRules} onSave={onSaveFareRules} /> : <div className="text-center text-gray-400 mt-10">Acesso restrito a administradores.</div>;
+        return isAdmin ? <ManageFares fareRules={fareRules} onSave={onSaveFareRules} /> : null;
       case 'financials':
         return <Financials rideHistory={rideHistory} drivers={drivers} currentDriver={currentDriver} />;
       default:
@@ -58,52 +65,63 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
     }
   };
 
-  const TabButton: React.FC<{tab: AdminTab; label: string}> = ({ tab, label }) => (
+  const TabButton: React.FC<{tab: AdminTab; label: string; icon?: string; restricted?: boolean}> = ({ tab, label, icon, restricted }) => (
     <button
       onClick={() => setActiveTab(tab)}
-      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors flex-shrink-0 ${
+      className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex-shrink-0 flex items-center whitespace-nowrap ${
         activeTab === tab 
-          ? 'bg-orange-500 text-white' 
-          : 'text-gray-300 hover:bg-gray-700'
-      }`}
+          ? 'bg-orange-500 text-white shadow-lg' 
+          : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+      } ${restricted ? 'border border-orange-500/30' : ''}`}
     >
+      {restricted && <i className="fa-solid fa-lock text-[10px] mr-2 text-orange-400"></i>}
+      {icon && <i className={`fa-solid ${icon} mr-2`}></i>}
       {label}
     </button>
   );
 
   return (
     <div className="bg-gray-800 h-full flex flex-col">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h2 className="text-xl font-bold text-white">Painel {isAdmin ? 'Administrativo' : 'do Motorista'}</h2>
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 shadow-md z-10">
+        <div className="flex items-center">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${isAdmin ? 'bg-orange-600' : 'bg-gray-700'}`}>
+                <i className={`fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-user-tie'} text-white`}></i>
+            </div>
+            <div>
+                <h2 className="text-lg font-bold text-white leading-tight">Painel {isAdmin ? 'Administrativo' : 'do Motorista'}</h2>
+                <p className="text-xs text-gray-400">{currentDriver?.name}</p>
+            </div>
+        </div>
         <button
           onClick={onExitAdminPanel}
           className="bg-gray-700 text-gray-300 hover:text-white border border-gray-600 hover:bg-gray-600 font-semibold py-2 px-4 rounded-lg text-sm transition-colors flex items-center"
-          title="Ir para tela de corrida"
+          title="Voltar para a tela inicial"
         >
-          <i className="fa-solid fa-car-side mr-2"></i>
+          <i className="fa-solid fa-arrow-left mr-2"></i>
           Voltar
         </button>
       </div>
       
-      <div className="p-2 border-b border-gray-700">
-        <div className="flex space-x-2 bg-gray-900 p-1 rounded-lg overflow-x-auto">
-          {isAdmin && <TabButton tab="dashboard" label="Dashboard" />}
-          <TabButton tab="financials" label="Financeiro" />
-          <TabButton tab="history" label="Corridas" />
-          <TabButton tab="passengers" label="Passageiros" />
+      <div className="p-3 border-b border-gray-700 bg-gray-800 shadow-inner">
+        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+          {isAdmin && <TabButton tab="dashboard" label="Visão Geral" icon="fa-chart-line" restricted />}
+          <TabButton tab="financials" label="Financeiro" icon="fa-wallet" />
+          <TabButton tab="history" label="Corridas" icon="fa-clock-rotate-left" />
+          <TabButton tab="passengers" label="Passageiros" icon="fa-users" />
           
           {/* Tabs visible only to Admins */}
           {isAdmin && (
             <>
-              <TabButton tab="drivers" label="Motoristas" />
-              <TabButton tab="admins" label="Admins" />
-              <TabButton tab="fares" label="Tarifas" />
+              <div className="w-px bg-gray-600 mx-2 h-8 self-center"></div>
+              <TabButton tab="drivers" label="Motoristas" icon="fa-id-card" restricted />
+              <TabButton tab="fares" label="Tarifas" icon="fa-tags" restricted />
+              <TabButton tab="admins" label="Admins" icon="fa-shield-halved" restricted />
             </>
           )}
         </div>
       </div>
       
-      <div className="flex-grow p-6 overflow-y-auto">
+      <div className="flex-grow p-6 overflow-y-auto bg-gray-800">
         {renderContent()}
       </div>
     </div>

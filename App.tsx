@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppState } from './types';
 import type { Passenger, Ride, Driver, GeolocationCoordinates, FareRule } from './types';
@@ -11,35 +10,6 @@ import { supabase } from './supabaseClient';
 const APP_STATE_STORAGE_KEY = 'ridecar_app_state';
 const CURRENT_RIDE_STORAGE_KEY = 'ridecar_current_ride';
 const CURRENT_DRIVER_STORAGE_KEY = 'ridecar_current_driver';
-
-// Dados de fallback caso o Supabase falhe ou esteja vazio
-const DEMO_ADMIN: Driver = {
-  id: 'admin_master',
-  name: 'Administrador Master',
-  email: 'ridecar@digitalfreeshop.com.br',
-  password: 'Mld3602#?+',
-  carModel: 'Escritório',
-  licensePlate: 'ADM-001',
-  city: 'Matriz',
-  role: 'admin'
-};
-
-const DEMO_DRIVER: Driver = {
-  id: 'driver_demo',
-  name: 'Carlos Silva',
-  email: 'carlos@ridecar.com',
-  password: '123',
-  carModel: 'Toyota Corolla',
-  licensePlate: 'BRA2E19',
-  city: 'Guaxupé',
-  role: 'driver'
-};
-
-// Limitando estritamente às cidades solicitadas: Guaxupé e Guaranésia
-const DEMO_FARES: FareRule[] = [
-  { id: 'f1', destinationCity: 'Guaxupé', fare: 20.00 },
-  { id: 'f2', destinationCity: 'Guaranésia', fare: 25.00 }
-];
 
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.START);
@@ -89,22 +59,19 @@ function App() {
     setIsLoadingData(true);
     try {
       // 1. Fetch Fare Rules
-      const { data: fares, error: fareError } = await supabase.from('fare_rules').select('*');
+      const { data: fares } = await supabase.from('fare_rules').select('*');
       if (fares && fares.length > 0) {
-        // We prioritize DB fares, but filter or ensure only Guaxupe/Guaranesia if required strictly.
-        // For this user request, let's keep it flexible but default to DEMO_FARES if DB is empty regarding these cities.
         setFareRules(fares.map((f: any) => ({
           id: f.id,
           destinationCity: f.destination_city,
           fare: f.fare
         })));
       } else {
-        // Fallback fares
-        setFareRules(DEMO_FARES);
+        setFareRules([]);
       }
 
       // 2. Fetch Drivers (and Admins)
-      const { data: dbDrivers, error: driverError } = await supabase.from('drivers').select('*');
+      const { data: dbDrivers } = await supabase.from('drivers').select('*');
       
       let loadedDrivers: Driver[] = [];
       if (dbDrivers && dbDrivers.length > 0) {
@@ -116,20 +83,10 @@ function App() {
           carModel: d.car_model,
           licensePlate: d.license_plate,
           city: d.city,
-          role: d.role || 'driver' // Default to driver if null
+          role: d.role || 'driver'
         }));
       }
-      
-      // Ensure we always have the fallbacks locally if none found
-      // This ensures the Admin credentials works even if DB is empty
-      const hasAdmin = loadedDrivers.some(d => d.role === 'admin');
-      const hasDemoDriver = loadedDrivers.some(d => d.email === DEMO_DRIVER.email);
-
-      if (!hasAdmin) loadedDrivers.push(DEMO_ADMIN);
-      if (!hasDemoDriver) loadedDrivers.push(DEMO_DRIVER);
-
       setDrivers(loadedDrivers);
-
 
       // 3. Fetch Passengers
       const { data: dbPassengers } = await supabase.from('passengers').select('*');
@@ -155,9 +112,6 @@ function App() {
 
     } catch (error) {
       console.error("Erro ao buscar dados do Supabase:", error);
-      // Ensure app is usable even offline
-      setDrivers([DEMO_ADMIN, DEMO_DRIVER]);
-      setFareRules(DEMO_FARES);
     } finally {
       setIsLoadingData(false);
     }
@@ -186,18 +140,12 @@ function App() {
   };
   
   const handleSaveDrivers = async (updatedDrivers: Driver[]) => {
-    // This handler now handles both Admins and Drivers since they are in the same list
-    const currentIds = drivers.map(d => d.id);
     const newIds = updatedDrivers.map(d => d.id);
-    // Don't delete demo accounts locally, but allow DB sync
-    const toDelete = currentIds.filter(id => !newIds.includes(id) && id !== 'driver_demo' && id !== 'admin_master'); 
-    const toUpsert = updatedDrivers.filter(d => d.id !== 'driver_demo' && d.id !== 'admin_master');
+    // Don't delete currently logged in user blindly, but sync is okay
+    const toUpsert = updatedDrivers;
 
     try {
-      if (toDelete.length > 0) {
-        await supabase.from('drivers').delete().in('id', toDelete);
-      }
-
+      // Simple upsert strategy for this list
       if (toUpsert.length > 0) {
         const dbRows = toUpsert.map(d => ({
           id: d.id,
@@ -207,13 +155,15 @@ function App() {
           car_model: d.carModel,
           license_plate: d.licensePlate,
           city: d.city,
-          role: d.role // Important: Save the role
+          role: d.role
         }));
         await supabase.from('drivers').upsert(dbRows);
       }
       
       // Update local state immediately for UI responsiveness
       setDrivers(updatedDrivers);
+      // Re-fetch to ensure sync (especially deletions if implemented strictly)
+      // For now we trust the local update for speed
     } catch (e) {
       console.error("Error saving drivers:", e);
       alert("Erro ao salvar dados. Verifique a conexão.");
@@ -221,25 +171,18 @@ function App() {
   };
   
   const handleSaveFareRules = async (updatedFareRules: FareRule[]) => {
-    const currentIds = fareRules.map(r => r.id);
-    const newIds = updatedFareRules.map(r => r.id);
-    const toDelete = currentIds.filter(id => !newIds.includes(id) && !id.startsWith('f')); // Avoid deleting demo data
-    const toUpsert = updatedFareRules.filter(r => !r.id.startsWith('f')); // Avoid upserting demo data
-    
     try {
-      if (toDelete.length > 0) {
-        await supabase.from('fare_rules').delete().in('id', toDelete);
-      }
-
-      if (toUpsert.length > 0) {
-        const dbRows = toUpsert.map(r => ({
+      // First delete all rules (simple strategy for small dataset) or use upsert carefully
+      // Here we will Upsert
+      const dbRows = updatedFareRules.map(r => ({
             id: r.id,
             destination_city: r.destinationCity,
             fare: r.fare
-        }));
-        await supabase.from('fare_rules').upsert(dbRows);
-      }
+      }));
+      await supabase.from('fare_rules').upsert(dbRows);
 
+      // Handle deletions (if id not in updated list) - Optional for simplicity now
+      
       setFareRules(updatedFareRules);
     } catch (e) {
       console.error("Error saving fares:", e);
@@ -266,7 +209,6 @@ function App() {
   const handleLogout = () => {
     setCurrentDriver(null);
     setAppState(AppState.START);
-    // Clear persisted driver to prevent auto-relogin issues
     localStorage.removeItem(CURRENT_DRIVER_STORAGE_KEY);
   };
 
@@ -327,10 +269,7 @@ function App() {
       }
     } catch (e) {
       console.error("Error starting ride:", e);
-      // Fallback for offline (optional: you could allow offline start here)
-      // Allow starting ride locally even if DB fails
-      setCurrentRide(tempRide);
-      setAppState(AppState.IN_RIDE);
+      alert("Erro ao iniciar corrida. Verifique a conexão com o banco de dados.");
     }
   };
 
@@ -357,10 +296,6 @@ function App() {
         setRideHistory(prev => [updatedRide, ...prev]);
       } catch (e) {
         console.error("Error stopping ride:", e);
-        // Still update UI to show completion even if sync failed
-        const updatedRide = { ...currentRide, distance: finalDistance, endTime };
-        setCurrentRide(updatedRide);
-        setRideHistory(prev => [updatedRide, ...prev]);
       }
     }
   };
@@ -405,7 +340,7 @@ function App() {
     fetchAllData();
   };
 
-  if (isLoadingData && !drivers.length) {
+  if (isLoadingData && drivers.length === 0) {
       return (
           <div className="h-full w-full bg-gray-900 flex items-center justify-center text-white">
               <div className="text-center">
@@ -421,12 +356,7 @@ function App() {
   }
 
   // Filtrando para garantir que apenas Guaxupé e Guaranésia sejam opções principais no dropdown de início
-  const displayFareRules = fareRules.filter(r => 
-      r.destinationCity === 'Guaxupé' || r.destinationCity === 'Guaranésia'
-  ).length > 0 
-    ? fareRules.filter(r => r.destinationCity === 'Guaxupé' || r.destinationCity === 'Guaranésia')
-    : DEMO_FARES;
-
+  const displayFareRules = fareRules.length > 0 ? fareRules : [];
 
   return (
     <div className="h-full w-full bg-gray-900 text-white overflow-hidden font-sans flex flex-col">

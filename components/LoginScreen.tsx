@@ -1,5 +1,4 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { RideCarLogo } from './icons';
 import Footer from './Footer';
 
@@ -12,10 +11,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
-    
-    // Secret Demo Logic
-    const [secretCount, setSecretCount] = useState(0);
-    const secretTimeoutRef = useRef<number | null>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,32 +19,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         if (!success) {
             setError('Email ou senha inválidos.');
         }
-    };
-
-    const fillDemoDriver = () => {
-        setEmail('carlos@ridecar.com');
-        setPassword('123');
-        setError(null); // Clear errors
-    };
-
-    const handleLogoClick = () => {
-        if (secretTimeoutRef.current) {
-            clearTimeout(secretTimeoutRef.current);
-        }
-
-        const newCount = secretCount + 1;
-        setSecretCount(newCount);
-
-        if (newCount >= 5) {
-            fillDemoDriver();
-            setSecretCount(0);
-            return;
-        }
-
-        // Reset count if no click for 1 second
-        secretTimeoutRef.current = window.setTimeout(() => {
-            setSecretCount(0);
-        }, 1000);
     };
 
     return (
@@ -65,15 +34,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             {/* Conteúdo principal */}
             <div className="relative z-10 flex-grow flex flex-col items-center justify-start pt-10 px-6 text-center">
                 
-                {/* Logo Centralizada com Segredo */}
-                <button 
-                    onClick={handleLogoClick} 
-                    className="mb-4 focus:outline-none transform active:scale-95 transition-transform"
-                    title="Toque 5 vezes para demo"
-                >
+                {/* Logo Centralizada */}
+                <div className="mb-4">
                      {/* Reduzido para w-32 (aprox 128px) */}
                      <RideCarLogo className="w-32 h-32" />
-                </button>
+                </div>
                 
                 <h2 className="text-xl font-medium text-gray-200 mb-6 max-w-xs drop-shadow-lg" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
                     Ferramenta de gestão para motoristas profissionais.
