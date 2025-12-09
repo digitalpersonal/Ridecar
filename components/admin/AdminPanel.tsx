@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Ride, Passenger, Driver, FareRule } from '../../types';
 import Dashboard from './Dashboard';
 import RideHistory from './RideHistory';
@@ -19,19 +19,28 @@ interface AdminPanelProps {
   onSaveFareRules: (fareRules: FareRule[]) => void;
   onExitAdminPanel: () => void;
   currentDriver: Driver | null;
+  initialTab?: string;
 }
 
 type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'admins' | 'fares' | 'financials';
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, drivers, fareRules, onSaveDrivers, onSavePassengers, onSaveFareRules, onExitAdminPanel, currentDriver }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, drivers, fareRules, onSaveDrivers, onSavePassengers, onSaveFareRules, onExitAdminPanel, currentDriver, initialTab = 'dashboard' }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+
+  useEffect(() => {
+    // Validate if the passed string is a valid tab
+    const validTabs: AdminTab[] = ['dashboard', 'history', 'passengers', 'drivers', 'admins', 'fares', 'financials'];
+    if (validTabs.includes(initialTab as AdminTab)) {
+        setActiveTab(initialTab as AdminTab);
+    }
+  }, [initialTab]);
 
   const isAdmin = currentDriver?.role === 'admin';
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard rideHistory={rideHistory} />;
+        return isAdmin ? <Dashboard rideHistory={rideHistory} /> : <div className="text-center text-gray-400 mt-10">Acesso restrito.</div>;
       case 'history':
         return <RideHistory rideHistory={rideHistory} />;
       case 'passengers':
@@ -72,13 +81,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
           title="Ir para tela de corrida"
         >
           <i className="fa-solid fa-car-side mr-2"></i>
-          Testar Corrida
+          Voltar
         </button>
       </div>
       
       <div className="p-2 border-b border-gray-700">
         <div className="flex space-x-2 bg-gray-900 p-1 rounded-lg overflow-x-auto">
-          <TabButton tab="dashboard" label="Dashboard" />
+          {isAdmin && <TabButton tab="dashboard" label="Dashboard" />}
           <TabButton tab="financials" label="Financeiro" />
           <TabButton tab="history" label="Corridas" />
           <TabButton tab="passengers" label="Passageiros" />

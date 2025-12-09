@@ -30,20 +30,22 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
   const [destSuggestions, setDestSuggestions] = useState<AddressSuggestion[]>([]);
   const debouncedAddress = useDebounce(editAddress, 500);
 
+  // Rastreamento GPS Ativo
   const { distance, currentPosition, path } = useRideTracking(!isRideFinished);
   
+  // Atualiza coordenadas do destino quando o endereço muda
   useEffect(() => {
     const fetchDestinationCoords = async () => {
-      if (ride.startLocation && ride.destination.address) {
+      if (ride.destination.address && ride.destination.city) {
         const coords = await getCoordinatesForAddress(
           ride.destination.address,
-          ride.startLocation
+          ride.destination.city // Passa a cidade correta
         );
         setDestinationCoords(coords);
       }
     };
     fetchDestinationCoords();
-  }, [ride.destination.address, ride.startLocation]);
+  }, [ride.destination.address, ride.destination.city]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -111,10 +113,6 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
   const displayTime = isRideFinished && ride.endTime ? ride.endTime - ride.startTime : elapsedTime;
   
   const availableCities = [...fareRules].sort((a, b) => a.destinationCity.localeCompare(b.destinationCity));
-  // If current city is not in rules (e.g. manual entry or legacy), add it? 
-  // For simplicity, just map rules, if user has custom city, the select might not show it perfectly if we forced it, 
-  // but let's assume valid cities. We can fallback to text input if needed but prompt implies selecting address.
-  // Using a datalist or similar could be better but let's stick to Select for cities to match StartRideForm.
 
   const renderButtons = () => {
     if (isRideFinished) {
@@ -159,6 +157,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
     path,
     destination: ride.destination,
     destinationCoords,
+    driverName: driver.name
   };
 
   return (
@@ -183,12 +182,12 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
         <div className="mb-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Passageiro</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wider">Passageiro</p>
               <p className="text-2xl font-bold text-orange-400">{ride.passenger.name}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold text-white">{driver.carModel}</p>
-              <p className="text-xs font-mono bg-gray-700 px-2 py-1 rounded text-gray-300 mt-1">{driver.licensePlate}</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wider">Motorista</p>
+              <p className="text-lg font-bold text-white">{driver.name}</p>
             </div>
           </div>
         </div>
@@ -238,6 +237,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
                             value={editAddress}
                             onChange={(e) => setEditAddress(e.target.value)}
                             placeholder="Endereço"
+                            autoComplete="off"
                             className="bg-gray-800 p-2 w-full text-white text-sm rounded border border-gray-600 focus:border-orange-500 focus:outline-none"
                         />
                          {destSuggestions.length > 0 && (

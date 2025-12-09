@@ -35,14 +35,16 @@ const DEMO_DRIVER: Driver = {
   role: 'driver'
 };
 
+// Limitando estritamente às cidades solicitadas: Guaxupé e Guaranésia
 const DEMO_FARES: FareRule[] = [
-  { id: 'f1', destinationCity: 'Guaxupé', fare: 35.00 },
-  { id: 'f2', destinationCity: 'Guaranésia', fare: 12.00 }
+  { id: 'f1', destinationCity: 'Guaxupé', fare: 20.00 },
+  { id: 'f2', destinationCity: 'Guaranésia', fare: 25.00 }
 ];
 
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.START);
   const [currentRide, setCurrentRide] = useState<Ride | null>(null);
+  const [initialDashboardTab, setInitialDashboardTab] = useState<string>('dashboard');
   
   // Data fetched from Supabase
   const [savedPassengers, setSavedPassengers] = useState<Passenger[]>([]);
@@ -89,13 +91,15 @@ function App() {
       // 1. Fetch Fare Rules
       const { data: fares, error: fareError } = await supabase.from('fare_rules').select('*');
       if (fares && fares.length > 0) {
+        // We prioritize DB fares, but filter or ensure only Guaxupe/Guaranesia if required strictly.
+        // For this user request, let's keep it flexible but default to DEMO_FARES if DB is empty regarding these cities.
         setFareRules(fares.map((f: any) => ({
           id: f.id,
           destinationCity: f.destination_city,
           fare: f.fare
         })));
       } else {
-        // Fallback fares if DB is empty or error
+        // Fallback fares
         setFareRules(DEMO_FARES);
       }
 
@@ -266,6 +270,11 @@ function App() {
     localStorage.removeItem(CURRENT_DRIVER_STORAGE_KEY);
   };
 
+  const handleNavigateToDashboard = (tab: string = 'dashboard') => {
+    setInitialDashboardTab(tab);
+    setAppState(AppState.ADMIN_PANEL);
+  };
+
   const handleStartRide = async (passenger: Passenger, destination: { address: string; city: string }, startLocation: GeolocationCoordinates | null, fare: number) => {
     if (!currentDriver || !startLocation) return;
     
@@ -355,11 +364,11 @@ function App() {
       }
     }
   };
-  
+
   const handleUpdateDestination = async (newDestination: { address: string; city: string }) => {
     if (!currentRide) return;
     
-    // Update local state
+    // Update local state immediately for UI response
     const updatedRide = { ...currentRide, destination: newDestination };
     setCurrentRide(updatedRide);
 
@@ -408,8 +417,16 @@ function App() {
   }
 
   if (!currentDriver) {
-    return <LoginScreen onLogin={handleLogin} onNavigateToAdmin={() => setAppState(AppState.ADMIN_PANEL)} />;
+    return <LoginScreen onLogin={handleLogin} onNavigateToAdmin={() => handleNavigateToDashboard('dashboard')} />;
   }
+
+  // Filtrando para garantir que apenas Guaxupé e Guaranésia sejam opções principais no dropdown de início
+  const displayFareRules = fareRules.filter(r => 
+      r.destinationCity === 'Guaxupé' || r.destinationCity === 'Guaranésia'
+  ).length > 0 
+    ? fareRules.filter(r => r.destinationCity === 'Guaxupé' || r.destinationCity === 'Guaranésia')
+    : DEMO_FARES;
+
 
   return (
     <div className="h-full w-full bg-gray-900 text-white overflow-hidden font-sans flex flex-col">
@@ -417,10 +434,10 @@ function App() {
         <StartRideForm 
           savedPassengers={savedPassengers}
           onStartRide={handleStartRide}
-          onNavigateToAdmin={() => setAppState(AppState.ADMIN_PANEL)}
+          onNavigateToAdmin={(tab) => handleNavigateToDashboard(tab)}
           currentDriver={currentDriver}
           onLogout={handleLogout}
-          fareRules={fareRules}
+          fareRules={displayFareRules}
         />
       )}
 
@@ -432,7 +449,7 @@ function App() {
           onSendWhatsApp={handleSendWhatsApp}
           onComplete={handleCompleteRide}
           onUpdateDestination={handleUpdateDestination}
-          fareRules={fareRules}
+          fareRules={displayFareRules}
         />
       )}
 
@@ -447,6 +464,7 @@ function App() {
           onSaveFareRules={handleSaveFareRules}
           onExitAdminPanel={() => setAppState(AppState.START)}
           currentDriver={currentDriver}
+          initialTab={initialDashboardTab}
         />
       )}
     </div>

@@ -1,69 +1,76 @@
+
 import type { AddressSuggestion, GeolocationCoordinates } from '../types';
 
-const MOCK_PLACES = [
-  "Avenida Principal, 123",
-  "Rua das Flores, 456",
-  "Praça Central, S/N",
-  "Shopping da Cidade, Loja 789",
-  "Aeroporto Internacional",
-  "Estação de Metrô Centro",
-  "Parque Municipal",
-  "Hospital Boa Saúde"
-];
-
 /**
- * Simula uma chamada de API de geocodificação, agora contextualizada pela cidade.
- * @param query O texto de busca do usuário.
- * @param city A cidade onde a busca deve ser realizada.
- * @returns Uma promessa que resolve para um array de sugestões de endereço.
+ * Busca sugestões de endereço usando a API Nominatim (OpenStreetMap).
+ * Retorna dados reais de ruas e locais na cidade especificada.
  */
 export const geocodeAddress = async (query: string, city: string): Promise<AddressSuggestion[]> => {
-  console.log(`Buscando endereço para: "${query}" em "${city}"`);
+  if (!query || query.length < 3) return [];
 
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (!query.trim() || !city.trim()) {
-        resolve([]);
-        return;
+  try {
+    // Adiciona o contexto da cidade e país para melhorar a precisão
+    const fullQuery = `${query}, ${city}, Brazil`;
+    
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&addressdetails=1&limit=5&countrycodes=br`,
+      {
+         headers: {
+             'Accept-Language': 'pt-BR'
+         }
       }
-      
-      const lowerCaseQuery = query.toLowerCase();
-      const filteredPlaces = MOCK_PLACES
-        .filter(place => place.toLowerCase().includes(lowerCaseQuery))
-        .map(place => ({ description: `${place}, ${city}` }));
+    );
+    
+    if (!response.ok) return [];
 
-      resolve(filteredPlaces);
-    }, 500); // Simula a latência da rede
-  });
+    const data = await response.json();
+    
+    // Mapeia os resultados do Nominatim para o formato do App
+    return data.map((item: any) => {
+        // Formata o endereço para ficar mais limpo
+        // O display_name do Nominatim é bem completo.
+        const cleanName = item.display_name.split(', Brazil')[0];
+        return {
+            description: cleanName
+        };
+    });
+  } catch (error) {
+    console.error("Geocoding error:", error);
+    return [];
+  }
 };
 
 /**
- * Simula a obtenção de coordenadas para um endereço de destino.
- * @param address O endereço de destino.
- * @param baseLocation A localização inicial para gerar um destino relativo.
- * @returns Uma promessa que resolve para as coordenadas do destino.
+ * Obtém as coordenadas exatas (Latitude/Longitude) de um endereço.
+ * Usa Nominatim para converter "Rua X, Guaxupé" em coordenadas GPS reais.
  */
 export const getCoordinatesForAddress = async (
   address: string,
-  baseLocation: GeolocationCoordinates
+  city: string
 ): Promise<GeolocationCoordinates | null> => {
-  console.log(`Geocodificando endereço: "${address}" relativo a`, baseLocation);
-
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (!baseLocation) {
-        resolve(null);
-        return;
+  try {
+    const fullQuery = `${address}, ${city}, Brazil`;
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&limit=1&countrycodes=br`,
+       {
+         headers: {
+             'Accept-Language': 'pt-BR'
+         }
       }
-      // Lógica de mock: cria um deslocamento pseudo-aleatório com base no comprimento do endereço
-      // para simular um local diferente para endereços diferentes, dentro de um intervalo razoável.
-      const latOffset = (address.length % 40 - 20) / 150; // aprox +/- 7km
-      const lngOffset = (address.length % 30 - 15) / 150; // aprox +/- 7km
+    );
 
-      resolve({
-        latitude: baseLocation.latitude + latOffset,
-        longitude: baseLocation.longitude + lngOffset,
-      });
-    }, 800); // Simula a latência da rede para geocodificação
-  });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return {
+        latitude: parseFloat(data[0].lat),
+        longitude: parseFloat(data[0].lon),
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Coordinate fetch error:", error);
+    return null;
+  }
 };

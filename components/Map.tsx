@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import type { GeolocationCoordinates } from '../types';
 
@@ -37,8 +38,6 @@ const Map: React.FC<MapProps> = ({ location, isLoading }) => {
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (map && location) {
-        map.setView([location.latitude, location.longitude], 18); // Zoom aumentado para 18 para uma visão de rua
-
         if (!markerRef.current) {
             // Darker blue for light map to ensure visibility
             const blueIcon = L.icon({
@@ -48,8 +47,13 @@ const Map: React.FC<MapProps> = ({ location, isLoading }) => {
                 popupAnchor: [0, -40]
             });
             markerRef.current = L.marker([location.latitude, location.longitude], { icon: blueIcon }).addTo(map);
+            
+            // Initial View Set
+            map.setView([location.latitude, location.longitude], 18);
         } else {
+            // Smooth update without full reset
             markerRef.current.setLatLng([location.latitude, location.longitude]);
+            map.panTo([location.latitude, location.longitude]);
         }
     }
   }, [location]);

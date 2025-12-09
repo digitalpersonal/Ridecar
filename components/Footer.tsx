@@ -49,15 +49,7 @@ const Footer: React.FC<FooterProps> = ({ onDemoClick }) => {
         Desenvolvido por Multiplus - Silvio T. de Sá Filho
       </p>
 
-      {/* 4. Link Demo (Aparece apenas se a função for passada - Tela de Login) */}
-      {onDemoClick && (
-          <button 
-              onClick={onDemoClick}
-              className="mt-8 text-[10px] text-gray-700 hover:text-gray-500 transition-colors border-t border-gray-800 pt-2 px-4"
-          >
-              [Entrar como Motorista Demo]
-          </button>
-      )}
+      {/* Demo button hidden for official use, but onDemoClick prop remains for code compatibility */}
     </footer>
   );
 };
