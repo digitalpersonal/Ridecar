@@ -96,6 +96,12 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
     }
   }, []);
 
+  // Se o destino mudar, força o reset do cálculo de rota para atualizar imediatamente
+  // Isso previne que a regra dos 30m bloqueie a atualização quando o motorista edita o destino.
+  useEffect(() => {
+    setLastRouteFetchLoc(null);
+  }, [destinationCoords]);
+
   // Fetch Optimal Route from OSRM
   useEffect(() => {
     const fetchRoute = async () => {
@@ -151,7 +157,7 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
             const route = data.routes[0];
             const geometry = route.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
             setRoutePath(geometry);
-            setLastRouteFetchLoc(origin); // Atualiza a posição de referência
+            setLastRouteFetchLoc(origin); // Atualiza a posição de referência para o próximo cálculo
         } else {
             // Se não achou rota, desenha linha reta no render (fallback visual)
             if (routePath.length === 0) setRoutePath([]);
@@ -163,7 +169,7 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
     };
 
     fetchRoute();
-  }, [currentLocation, destinationCoords]); // Removed startLocation dependency loop
+  }, [currentLocation, destinationCoords, startLocation]); // Recalcula se mudar posição ou destino
 
 
   // Renderização do Mapa

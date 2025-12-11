@@ -37,25 +37,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
 
   const isAdmin = currentDriver?.role === 'admin';
 
-  // Se um usuário não-admin tentar acessar uma aba restrita, redireciona para financials
+  // Se um usuário não-admin tentar acessar uma aba restrita, redireciona para dashboard
   useEffect(() => {
-    if (!isAdmin && ['dashboard', 'drivers', 'admins', 'fares'].includes(activeTab)) {
-        setActiveTab('financials');
+    if (!isAdmin && ['drivers', 'admins', 'fares'].includes(activeTab)) {
+        setActiveTab('dashboard');
     }
   }, [isAdmin, activeTab]);
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return isAdmin ? <Dashboard rideHistory={rideHistory} /> : null;
+        return <Dashboard rideHistory={rideHistory} currentDriver={currentDriver} />;
       case 'history':
-        return <RideHistory rideHistory={rideHistory} />;
+        return <RideHistory rideHistory={rideHistory} currentDriver={currentDriver} />;
       case 'passengers':
+        // Passageiros são compartilhados (base de clientes da empresa), então todos veem
         return <ManagePassengers passengers={passengers} onSave={onSavePassengers} />;
       case 'drivers':
-        return isAdmin ? <ManageDrivers drivers={drivers} onSave={onSaveDrivers} /> : null;
+        return isAdmin ? <ManageDrivers drivers={drivers} fareRules={fareRules} onSave={onSaveDrivers} /> : null;
       case 'admins':
-        return isAdmin ? <ManageAdmins drivers={drivers} onSave={onSaveDrivers} currentDriverId={currentDriver?.id || ''} /> : null;
+        return isAdmin ? <ManageAdmins drivers={drivers} fareRules={fareRules} onSave={onSaveDrivers} currentDriverId={currentDriver?.id || ''} /> : null;
       case 'fares':
         return isAdmin ? <ManageFares fareRules={fareRules} onSave={onSaveFareRules} /> : null;
       case 'financials':
@@ -84,12 +85,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
     <div className="bg-gray-800 h-full flex flex-col">
       <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 shadow-md z-10">
         <div className="flex items-center">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${isAdmin ? 'bg-orange-600' : 'bg-gray-700'}`}>
-                <i className={`fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-user-tie'} text-white`}></i>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${isAdmin ? 'bg-orange-600' : 'bg-blue-600'}`}>
+                <i className={`fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-id-card'} text-white`}></i>
             </div>
             <div>
-                <h2 className="text-lg font-bold text-white leading-tight">Painel {isAdmin ? 'Administrativo' : 'do Motorista'}</h2>
-                <p className="text-xs text-gray-400">{currentDriver?.name}</p>
+                <h2 className="text-lg font-bold text-white leading-tight">
+                    {isAdmin ? 'Painel Administrativo' : 'Painel do Motorista'}
+                </h2>
+                <p className="text-xs text-gray-400">
+                    Olá, <span className="text-orange-400">{currentDriver?.name}</span>
+                </p>
             </div>
         </div>
         <button
@@ -104,18 +109,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
       
       <div className="p-3 border-b border-gray-700 bg-gray-800 shadow-inner">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
-          {isAdmin && <TabButton tab="dashboard" label="Visão Geral" icon="fa-chart-line" restricted />}
+          <TabButton tab="dashboard" label="Resumo" icon="fa-chart-pie" />
           <TabButton tab="financials" label="Financeiro" icon="fa-wallet" />
-          <TabButton tab="history" label="Corridas" icon="fa-clock-rotate-left" />
+          <TabButton tab="history" label="Minhas Corridas" icon="fa-clock-rotate-left" />
           <TabButton tab="passengers" label="Passageiros" icon="fa-users" />
           
           {/* Tabs visible only to Admins */}
           {isAdmin && (
             <>
               <div className="w-px bg-gray-600 mx-2 h-8 self-center"></div>
-              <TabButton tab="drivers" label="Motoristas" icon="fa-id-card" restricted />
+              <TabButton tab="drivers" label="Equipe" icon="fa-car-side" restricted />
               <TabButton tab="fares" label="Tarifas" icon="fa-tags" restricted />
-              <TabButton tab="admins" label="Admins" icon="fa-shield-halved" restricted />
+              <TabButton tab="admins" label="Acessos" icon="fa-shield-halved" restricted />
             </>
           )}
         </div>

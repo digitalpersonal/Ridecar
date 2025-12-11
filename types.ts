@@ -45,6 +45,8 @@ export interface Driver {
   licensePlate: string;
   city: string;
   role?: 'admin' | 'driver'; // New field for RBAC
+  pixKey?: string; // Chave PIX específica do motorista
+  photoUrl?: string; // URL da foto do motorista
 }
 
 export interface FareRule {

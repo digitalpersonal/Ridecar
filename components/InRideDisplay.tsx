@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import type { Ride, Driver, GeolocationCoordinates, FareRule, AddressSuggestion } from '../types';
 import { useRideTracking } from '../hooks/useRideTracking';
-import { getCoordinatesForAddress, geocodeAddress } from '../services/geocodingService';
+import { getCoordinatesForAddress, geocodeAddress, getAddressFromCoordinates } from '../services/geocodingService';
 import { useDebounce } from '../hooks/useDebounce';
-import { WhatsAppIcon, ExpandIcon, CompressIcon, PinIcon } from './icons';
+import { WhatsAppIcon, ExpandIcon, CompressIcon, PinIcon, RideCarLogo } from './icons';
 import RideMap from './RideMap';
 
 interface InRideDisplayProps {
@@ -22,6 +22,9 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
   const isRideFinished = !!ride.endTime;
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [destinationCoords, setDestinationCoords] = useState<GeolocationCoordinates | null>(null);
+  
+  // Estado para o endereço de origem
+  const [startAddress, setStartAddress] = useState<string>('Buscando endereço...');
 
   // Edit Destination State
   const [isEditingDest, setIsEditingDest] = useState(false);
@@ -33,6 +36,23 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
   // Rastreamento GPS Ativo
   const { distance, currentPosition, path } = useRideTracking(!isRideFinished);
   
+  // Busca o endereço legível da origem (Reverse Geocoding)
+  useEffect(() => {
+    const fetchStartAddress = async () => {
+      if (ride.startLocation) {
+        const address = await getAddressFromCoordinates(ride.startLocation.latitude, ride.startLocation.longitude);
+        if (address) {
+          setStartAddress(address);
+        } else {
+          setStartAddress(`${ride.startLocation.latitude.toFixed(4)}, ${ride.startLocation.longitude.toFixed(4)}`);
+        }
+      } else {
+        setStartAddress('Localização desconhecida');
+      }
+    };
+    fetchStartAddress();
+  }, [ride.startLocation]);
+
   // Atualiza coordenadas do destino quando o endereço muda
   useEffect(() => {
     const fetchDestinationCoords = async () => {
@@ -126,10 +146,10 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
           </div>
           <button
             onClick={onSendWhatsApp}
-            className="w-full flex items-center justify-center bg-green-500 text-white font-bold py-3 px-4 rounded-lg transition-colors hover:bg-green-600"
+            className="w-full flex items-center justify-center bg-green-500 text-white font-bold py-3 px-4 rounded-lg transition-colors hover:bg-green-600 shadow-lg"
           >
             <WhatsAppIcon className="text-2xl mr-3" />
-            Enviar PIX via WhatsApp
+            Enviar Chave PIX
           </button>
           <button
             onClick={onComplete}
@@ -144,7 +164,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
     return (
       <button
         onClick={() => onStopRide(distance)}
-        className="w-full bg-red-500 text-white font-bold py-3 px-4 rounded-lg transition-colors hover:bg-red-600"
+        className="w-full bg-red-500 text-white font-bold py-3 px-4 rounded-lg transition-colors hover:bg-red-600 shadow-lg"
       >
         Finalizar Viagem
       </button>
@@ -162,44 +182,92 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
 
   return (
     <div className="absolute inset-0 flex flex-col">
+      {/* HEADER FIXO DA CORRIDA */}
+      <div className="absolute top-0 left-0 w-full z-20 p-4 bg-gradient-to-b from-gray-900/90 to-transparent flex justify-between items-start pointer-events-none">
+          <div className="pointer-events-auto bg-gray-900/40 backdrop-blur-md rounded-full px-4 py-2 border border-orange-500/20 shadow-lg">
+              <RideCarLogo className="h-10 w-auto" horizontal={true} />
+          </div>
+          
+          {!isRideFinished && (
+            <button
+                onClick={() => setIsMapExpanded(true)}
+                className="pointer-events-auto p-2 bg-gray-800/80 rounded-full text-white backdrop-blur-sm hover:bg-gray-700 transition-colors shadow-lg border border-gray-700"
+                aria-label="Expandir mapa"
+            >
+                <ExpandIcon className="w-6 h-6" />
+            </button>
+          )}
+      </div>
+
       {/* Map Section */}
       <div className="flex-grow relative">
         <RideMap {...rideMapProps} />
-        {!isRideFinished && (
-          <button
-            onClick={() => setIsMapExpanded(true)}
-            className="absolute top-4 right-4 z-[1000] p-2 bg-gray-800/60 rounded-full text-white backdrop-blur-sm hover:bg-gray-700/80 transition-colors"
-            aria-label="Expandir mapa"
-          >
-            <ExpandIcon className="w-6 h-6" />
-          </button>
-        )}
       </div>
       
       {/* Bottom Panel Section */}
-      <div className="bg-gray-800 rounded-t-2xl shadow-lg p-6 flex-shrink-0 z-10">
+      <div className="bg-gray-800 rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.5)] p-6 flex-shrink-0 z-10 border-t border-gray-700">
         {/* Ride Info Header */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between">
+        <div className="mb-4 border-b border-gray-700 pb-4">
+          <div className="flex items-start justify-between">
+            {/* Passageiro */}
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wider">Passageiro</p>
-              <p className="text-2xl font-bold text-orange-400">{ride.passenger.name}</p>
+              <p className="text-2xl font-bold text-orange-400 leading-tight">{ride.passenger.name}</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-400 uppercase tracking-wider">Motorista</p>
-              <p className="text-lg font-bold text-white">{driver.name}</p>
+
+            {/* Motorista e Carro - AGORA COM FOTO */}
+            <div className="flex items-center text-right">
+              <div className="mr-3">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Motorista</p>
+                  <p className="text-lg font-bold text-white leading-tight">{driver.name}</p>
+                  <div className="mt-1 flex flex-col items-end">
+                      <span className="text-xs text-gray-300 font-medium">{driver.carModel}</span>
+                      <span className="text-[10px] font-mono bg-gray-900 px-1.5 py-0.5 rounded text-orange-400 border border-gray-600 mt-0.5 uppercase tracking-wide">
+                          {driver.licensePlate}
+                      </span>
+                  </div>
+              </div>
+              
+              {/* Foto do Motorista (Avatar) */}
+              <div className="w-14 h-14 rounded-full bg-gray-700 border-2 border-orange-500 overflow-hidden shadow-lg flex-shrink-0">
+                  {driver.photoUrl ? (
+                      <img src={driver.photoUrl} alt={driver.name} className="w-full h-full object-cover" />
+                  ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                          <i className="fa-solid fa-user-astronaut text-2xl text-gray-400"></i>
+                      </div>
+                  )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Destination Info & Edit */}
-        <div className="mb-6 bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+        {/* Route Info (Start & End) */}
+        <div className="mb-6 bg-gray-700/50 p-3 rounded-lg border border-gray-600 space-y-3">
+           
+           {/* Origem */}
+           <div className="flex items-center">
+                <div className="flex flex-col items-center mr-3 w-6 flex-shrink-0">
+                    <i className="fa-solid fa-circle-dot text-green-500 text-sm"></i>
+                    <div className="h-8 w-0.5 bg-gray-600 my-1"></div>
+                </div>
+                <div className="overflow-hidden w-full">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">Origem</p>
+                    <p className="text-white font-medium text-sm truncate" title={startAddress}>
+                        {startAddress}
+                    </p>
+                </div>
+           </div>
+
+           {/* Destino Info & Edit */}
            {!isEditingDest ? (
                <div className="flex items-center justify-between">
-                   <div className="flex items-center overflow-hidden">
-                       <PinIcon className="h-6 w-6 text-orange-500 mr-3 flex-shrink-0" />
-                       <div className="truncate">
-                           <p className="text-xs text-gray-400">Destino</p>
+                   <div className="flex items-center overflow-hidden w-full">
+                       <div className="flex flex-col items-center mr-3 w-6 flex-shrink-0">
+                            <i className="fa-solid fa-location-dot text-red-500 text-lg"></i>
+                       </div>
+                       <div className="truncate flex-grow">
+                           <p className="text-[10px] text-gray-400 uppercase tracking-wider">Destino</p>
                            <p className="text-white font-medium truncate">{ride.destination.address}</p>
                            <p className="text-xs text-gray-400">{ride.destination.city}</p>
                        </div>
@@ -207,7 +275,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
                    {!isRideFinished && (
                        <button 
                            onClick={() => setIsEditingDest(true)}
-                           className="ml-2 p-2 text-gray-400 hover:text-white bg-gray-700 rounded-full hover:bg-gray-600 transition-colors"
+                           className="ml-2 p-2 text-gray-400 hover:text-white bg-gray-700 rounded-full hover:bg-gray-600 transition-colors flex-shrink-0"
                            title="Editar Destino"
                        >
                            <i className="fa-solid fa-pencil"></i>
@@ -215,7 +283,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
                    )}
                </div>
            ) : (
-               <div className="space-y-3">
+               <div className="space-y-3 pl-9">
                    <p className="text-xs text-orange-400 font-bold uppercase">Editar Destino</p>
                    
                    {/* City Select */}
@@ -270,18 +338,18 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
         </div>
 
         {/* Ride stats */}
-        <div className="grid grid-cols-3 gap-4 text-center bg-gray-700 p-4 rounded-lg mb-6">
+        <div className="grid grid-cols-3 gap-4 text-center bg-gray-700/80 p-4 rounded-lg mb-6 border border-gray-600">
           <div>
-            <p className="text-sm text-gray-400">Tempo</p>
-            <p className="text-2xl font-semibold font-mono">{formatTime(displayTime)}</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wider">Tempo</p>
+            <p className="text-xl font-semibold font-mono">{formatTime(displayTime)}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-400">Distância</p>
-            <p className="text-2xl font-semibold font-mono">{displayDistance.toFixed(2)} <span className="text-base">km</span></p>
+            <p className="text-xs text-gray-400 uppercase tracking-wider">Distância</p>
+            <p className="text-xl font-semibold font-mono">{displayDistance.toFixed(2)} <span className="text-sm">km</span></p>
           </div>
           <div>
-            <p className="text-sm text-gray-400">Valor</p>
-            <p className="text-2xl font-semibold font-mono">R${ride.fare.toFixed(2)}</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wider">Valor</p>
+            <p className="text-xl font-semibold font-mono text-orange-400">R${ride.fare.toFixed(2)}</p>
           </div>
         </div>
         
@@ -307,8 +375,8 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
             <CompressIcon className="w-6 h-6" />
           </button>
         </div>
-        <div className="bg-gray-900/80 p-3 text-center backdrop-blur-sm flex-shrink-0 z-10">
-          <p className="text-sm text-gray-400">Destino</p>
+        <div className="bg-gray-900/80 p-3 text-center backdrop-blur-sm flex-shrink-0 z-10 border-t border-gray-700">
+          <p className="text-xs text-gray-400">Destino</p>
           <p className="text-lg font-bold text-white truncate">{ride.destination.address}</p>
         </div>
       </div>

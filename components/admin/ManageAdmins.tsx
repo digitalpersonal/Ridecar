@@ -1,25 +1,26 @@
 
 import React, { useState } from 'react';
-import type { Driver } from '../../types';
+import type { Driver, FareRule } from '../../types';
 import { UserIcon } from '../icons';
 
 interface ManageAdminsProps {
   drivers: Driver[];
+  fareRules: FareRule[];
   onSave: (drivers: Driver[]) => void;
   currentDriverId: string;
 }
 
-const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, onSave, currentDriverId }) => {
+const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, fareRules, onSave, currentDriverId }) => {
   // Filter specifically for users with role 'admin'
   const admins = drivers.filter(d => d.role === 'admin');
   
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Omit<Driver, 'id' | 'role'>>({ 
-    name: '', email: '', password: '', carModel: 'Escritório', licensePlate: 'ADM', city: 'Matriz'
+    name: '', email: '', password: '', carModel: 'Escritório', licensePlate: 'ADM', city: '', pixKey: ''
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -27,12 +28,15 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, onSave, currentDri
   const handleCancel = () => {
     setIsFormVisible(false);
     setEditingId(null);
-    setFormData({ name: '', email: '', password: '', carModel: 'Escritório', licensePlate: 'ADM', city: 'Matriz' });
+    setFormData({ name: '', email: '', password: '', carModel: 'Escritório', licensePlate: 'ADM', city: '', pixKey: '' });
   };
 
   const handleAddNewClick = () => {
     setEditingId(null);
-    setFormData({ name: '', email: '', password: '', carModel: 'Escritório', licensePlate: 'ADM', city: 'Matriz' });
+    // Tenta definir Guaranésia como padrão, senão pega a primeira da lista, senão vazio
+    const defaultCity = fareRules.find(r => r.destinationCity === 'Guaranésia')?.destinationCity || (fareRules.length > 0 ? fareRules[0].destinationCity : 'Matriz');
+
+    setFormData({ name: '', email: '', password: '', carModel: 'Escritório', licensePlate: 'ADM', city: defaultCity, pixKey: '' });
     setIsFormVisible(true);
   };
 
@@ -44,7 +48,8 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, onSave, currentDri
         password: admin.password || '',
         carModel: admin.carModel,
         licensePlate: admin.licensePlate,
-        city: admin.city
+        city: admin.city,
+        pixKey: admin.pixKey || ''
     });
     setIsFormVisible(true);
   };
@@ -90,6 +95,9 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, onSave, currentDri
   };
 
   const isFormValid = formData.name.trim() && formData.email.trim() && formData.password?.trim();
+  
+  // Ordena cidades para o select
+  const availableCities = [...fareRules].sort((a, b) => a.destinationCity.localeCompare(b.destinationCity));
 
   return (
     <div>
@@ -109,47 +117,87 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, onSave, currentDri
               {editingId ? 'Editar Administrador' : 'Novo Administrador'}
           </h4>
           <form onSubmit={handleSubmit} className="space-y-4">
-             <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <UserIcon className="h-5 w-5 text-gray-400" />
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <UserIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                    type="text"
+                    name="name"
+                    placeholder="Nome"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required
+                    />
                 </div>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Nome"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i className="fa-solid fa-at text-gray-400"></i>
+                    </div>
+                    <input
+                    type="email"
+                    name="email"
+                    placeholder="Email de Login"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required
+                    />
+                </div>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i className="fa-solid fa-key text-gray-400"></i>
+                    </div>
+                    <input
+                    type="text"
+                    name="password"
+                    placeholder="Senha"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required
+                    />
+                </div>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i className="fa-brands fa-pix text-gray-400"></i>
+                    </div>
+                    <input
+                    type="text"
+                    name="pixKey"
+                    placeholder="Chave PIX (Opcional)"
+                    value={formData.pixKey || ''}
+                    onChange={handleInputChange}
+                    className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                </div>
             </div>
-             <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <i className="fa-solid fa-at text-gray-400"></i>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative">
+                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i className="fa-solid fa-city text-gray-400"></i>
+                    </div>
+                    <select
+                        name="city"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none"
+                    >
+                         <option value="">Selecione a cidade...</option>
+                         <option value="Matriz">Matriz (Padrão)</option>
+                         {availableCities.map((rule) => (
+                             <option key={rule.id} value={rule.destinationCity}>
+                                 {rule.destinationCity}
+                             </option>
+                         ))}
+                    </select>
                 </div>
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Email de Login"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
-            </div>
-             <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <i className="fa-solid fa-key text-gray-400"></i>
-                </div>
-                <input
-                  type="text"
-                  name="password"
-                  placeholder="Senha"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
             </div>
             
             <button
@@ -169,6 +217,8 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, onSave, currentDri
             <div>
               <p className="font-bold text-white">{admin.name} {admin.id === currentDriverId && '(Você)'}</p>
                <p className="text-sm text-gray-300">{admin.email}</p>
+               {admin.pixKey && <p className="text-xs text-green-400 mt-1">PIX: {admin.pixKey}</p>}
+               <p className="text-xs text-gray-500 mt-1">Cidade: {admin.city}</p>
             </div>
             <div className="flex items-center space-x-2">
                 <button 

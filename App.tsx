@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppState } from './types';
 import type { Passenger, Ride, Driver, GeolocationCoordinates, FareRule } from './types';
@@ -83,7 +84,8 @@ function App() {
           carModel: d.car_model,
           licensePlate: d.license_plate,
           city: d.city,
-          role: d.role || 'driver'
+          role: d.role || 'driver',
+          pixKey: d.pix_key // Map snake_case to camelCase
         }));
       }
       setDrivers(loadedDrivers);
@@ -101,8 +103,8 @@ function App() {
           driverId: r.driver_id,
           passenger: r.passenger_json,
           destination: r.destination_json,
-          startTime: r.start_time,
-          endTime: r.end_time,
+          startTime: new Date(r.start_time).getTime(),
+          endTime: r.end_time ? new Date(r.end_time).getTime() : undefined,
           distance: r.distance,
           fare: r.fare,
           startLocation: r.start_location_json
@@ -140,8 +142,6 @@ function App() {
   };
   
   const handleSaveDrivers = async (updatedDrivers: Driver[]) => {
-    const newIds = updatedDrivers.map(d => d.id);
-    // Don't delete currently logged in user blindly, but sync is okay
     const toUpsert = updatedDrivers;
 
     try {
@@ -155,15 +155,14 @@ function App() {
           car_model: d.carModel,
           license_plate: d.licensePlate,
           city: d.city,
-          role: d.role
+          role: d.role,
+          pix_key: d.pixKey // Save pixKey to snake_case column
         }));
         await supabase.from('drivers').upsert(dbRows);
       }
       
       // Update local state immediately for UI responsiveness
       setDrivers(updatedDrivers);
-      // Re-fetch to ensure sync (especially deletions if implemented strictly)
-      // For now we trust the local update for speed
     } catch (e) {
       console.error("Error saving drivers:", e);
       alert("Erro ao salvar dados. Verifique a conexão.");
@@ -172,16 +171,12 @@ function App() {
   
   const handleSaveFareRules = async (updatedFareRules: FareRule[]) => {
     try {
-      // First delete all rules (simple strategy for small dataset) or use upsert carefully
-      // Here we will Upsert
       const dbRows = updatedFareRules.map(r => ({
             id: r.id,
             destination_city: r.destinationCity,
             fare: r.fare
       }));
       await supabase.from('fare_rules').upsert(dbRows);
-
-      // Handle deletions (if id not in updated list) - Optional for simplicity now
       
       setFareRules(updatedFareRules);
     } catch (e) {
@@ -220,9 +215,12 @@ function App() {
   const handleStartRide = async (passenger: Passenger, destination: { address: string; city: string }, startLocation: GeolocationCoordinates | null, fare: number) => {
     if (!currentDriver || !startLocation) return;
     
+    // Clean WhatsApp number (digits only) for DB consistency
+    const cleanWhatsapp = passenger.whatsapp.replace(/\D/g, '');
+
     // 1. Prepare initial Ride object
     const tempRide: Ride = {
-      passenger,
+      passenger: { ...passenger, whatsapp: cleanWhatsapp },
       destination,
       startTime: Date.now(),
       distance: 0,
@@ -235,12 +233,20 @@ function App() {
       // 2. Save/Update passenger in DB (upsert by whatsapp)
       const { data: savedPassengerData } = await supabase.from('passengers').upsert({
         name: passenger.name,
-        whatsapp: passenger.whatsapp,
+        whatsapp: cleanWhatsapp,
         cpf: passenger.cpf
       }, { onConflict: 'whatsapp' }).select().single();
 
       if (savedPassengerData) {
-        tempRide.passenger = { ...passenger, id: savedPassengerData.id };
+        // Update tempRide with ID from DB
+        tempRide.passenger = { ...passenger, id: savedPassengerData.id, whatsapp: cleanWhatsapp };
+        
+        // Update local state immediately so autocomplete works for next ride without refetch
+        setSavedPassengers(prev => {
+           // Remove if exists (by whatsapp) and add new/updated
+           const others = prev.filter(p => p.whatsapp.replace(/\D/g, '') !== cleanWhatsapp);
+           return [...others, savedPassengerData];
+        });
       }
 
       // 3. Insert Ride into DB
@@ -248,7 +254,7 @@ function App() {
         driver_id: currentDriver.id,
         passenger_json: tempRide.passenger,
         destination_json: destination,
-        start_time: tempRide.startTime,
+        start_time: new Date(tempRide.startTime).toISOString(),
         start_location_json: startLocation,
         fare: fare,
         distance: 0
@@ -264,8 +270,8 @@ function App() {
         setCurrentRide(finalRide);
         setAppState(AppState.IN_RIDE);
         
-        // Refresh passenger list in background
-        fetchAllData(); 
+        // Refresh passenger list in background (backup)
+        // fetchAllData(); // Commented out to rely on optimistic update above for speed
       }
     } catch (e) {
       console.error("Error starting ride:", e);
@@ -281,7 +287,7 @@ function App() {
         if (currentRide.id) {
             // Update DB
             const { error } = await supabase.from('rides').update({
-            end_time: endTime,
+            end_time: new Date(endTime).toISOString(),
             distance: finalDistance,
             }).eq('id', currentRide.id);
 
@@ -292,8 +298,21 @@ function App() {
         const updatedRide = { ...currentRide, distance: finalDistance, endTime };
         setCurrentRide(updatedRide);
 
-        // Update History Local
-        setRideHistory(prev => [updatedRide, ...prev]);
+        // Update History Local (Smart Update: Upsert)
+        // Isso previne duplicatas se a corrida já foi carregada do DB durante um refresh
+        setRideHistory(prev => {
+           const existingIndex = prev.findIndex(r => r.id === updatedRide.id);
+           if (existingIndex >= 0) {
+               // Atualiza a entrada existente
+               const newHistory = [...prev];
+               newHistory[existingIndex] = updatedRide;
+               return newHistory;
+           } else {
+               // Adiciona nova entrada no topo
+               return [updatedRide, ...prev];
+           }
+        });
+
       } catch (e) {
         console.error("Error stopping ride:", e);
       }
@@ -303,11 +322,9 @@ function App() {
   const handleUpdateDestination = async (newDestination: { address: string; city: string }) => {
     if (!currentRide) return;
     
-    // Update local state immediately for UI response
     const updatedRide = { ...currentRide, destination: newDestination };
     setCurrentRide(updatedRide);
 
-    // Update DB
     if (updatedRide.id) {
         try {
             await supabase.from('rides').update({
@@ -321,12 +338,11 @@ function App() {
 
   const handleSendWhatsApp = () => {
     if (currentRide && currentDriver) {
-      const message = `Olá ${currentRide.passenger.name}, sua corrida com ${currentDriver.name} foi finalizada.\n\n` +
-        `*Destino:* ${currentRide.destination.address}\n` +
-        `*Distância:* ${currentRide.distance.toFixed(2)} km\n` +
-        `*Total a pagar:* R$ ${currentRide.fare.toFixed(2)}\n\n` +
-        `Chave PIX: ${currentDriver.email}\n` + 
-        `Obrigado pela preferência!`;
+      // USA O PIX DO MOTORISTA OU O EMAIL COMO FALLBACK
+      const pixKey = currentDriver.pixKey || currentDriver.email;
+
+      // ATENÇÃO: Envia APENAS a chave PIX (sem texto adicional) para facilitar o "Copia e Cola" no banco
+      const message = pixKey;
       
       const encodedMessage = encodeURIComponent(message);
       window.open(`https://wa.me/55${currentRide.passenger.whatsapp}?text=${encodedMessage}`, '_blank');
@@ -336,7 +352,7 @@ function App() {
   const handleCompleteRide = () => {
     setCurrentRide(null);
     setAppState(AppState.START);
-    // Refresh history
+    // Force refresh history to ensure everything is synced
     fetchAllData();
   };
 
@@ -355,7 +371,6 @@ function App() {
     return <LoginScreen onLogin={handleLogin} onNavigateToAdmin={() => handleNavigateToDashboard('dashboard')} />;
   }
 
-  // Filtrando para garantir que apenas Guaxupé e Guaranésia sejam opções principais no dropdown de início
   const displayFareRules = fareRules.length > 0 ? fareRules : [];
 
   return (

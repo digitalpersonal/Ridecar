@@ -20,6 +20,7 @@ interface StartRideFormProps {
 const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartRide, onNavigateToAdmin, currentDriver, onLogout, fareRules }) => {
   const [passenger, setPassenger] = useState<Passenger>({ name: '', whatsapp: '', cpf: '' });
   const [destinationAddress, setDestinationAddress] = useState('');
+  const [destinationNumber, setDestinationNumber] = useState(''); // New state for street number
   const [destinationCity, setDestinationCity] = useState('');
   
   // Suggestion States
@@ -97,10 +98,16 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Combine street and number
+    const fullAddress = destinationNumber.trim() 
+        ? `${destinationAddress}, ${destinationNumber}` 
+        : destinationAddress;
+
     if (passenger.name && passenger.whatsapp && destinationAddress && destinationCity && location && currentFareRule) {
       onStartRide(
         passenger, 
-        { address: destinationAddress, city: destinationCity }, 
+        { address: fullAddress, city: destinationCity }, 
         location,
         currentFareRule.fare
       );
@@ -120,8 +127,8 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
         
         {/* Sidebar */}
         <div className={`fixed inset-y-0 left-0 w-64 bg-gray-800 z-50 transform transition-transform duration-300 shadow-2xl ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            <div className="p-6 border-b border-gray-700 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white italic">Ride<span className="text-orange-500">Car</span></h2>
+            <div className="p-6 border-b border-gray-700 flex items-center justify-between bg-gray-900">
+                <RideCarLogo className="h-8 w-auto" horizontal={true} />
                 <button onClick={() => setIsMenuOpen(false)} className="text-gray-400 hover:text-white">
                     <i className="fa-solid fa-times text-xl"></i>
                 </button>
@@ -129,8 +136,14 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             
             <div className="p-4">
                 <div className="mb-6 flex flex-col items-center">
-                    <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mb-2 border-2 border-orange-500">
-                         <i className="fa-solid fa-user text-2xl text-gray-300"></i>
+                    <div className="w-16 h-16 bg-gray-700 rounded-full mb-2 border-2 border-orange-500 overflow-hidden">
+                         {currentDriver.photoUrl ? (
+                            <img src={currentDriver.photoUrl} alt={currentDriver.name} className="w-full h-full object-cover" />
+                         ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <i className="fa-solid fa-user text-2xl text-gray-300"></i>
+                            </div>
+                         )}
                     </div>
                     <p className="text-white font-bold">{currentDriver.name}</p>
                     <p className="text-xs text-gray-400">{currentDriver.role === 'admin' ? 'Administrador' : 'Motorista'}</p>
@@ -190,15 +203,16 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             >
                 <i className="fa-solid fa-bars text-2xl"></i>
             </button>
-            <div className="flex flex-col">
-                 <span className="text-xs text-gray-400 leading-none">Motorista</span>
-                 <span className="text-sm font-bold text-white leading-tight truncate max-w-[150px]">{currentDriver.name}</span>
+            {/* Logo agora fica a esquerda, junto com o menu */}
+            <div className="h-10">
+                 <RideCarLogo className="h-full w-auto" horizontal={true} />
             </div>
         </div>
         
-        {/* Small Logo fixed size */}
-        <div className="w-10 h-10">
-             <RideCarLogo className="w-10 h-10" />
+        {/* User Info Right */}
+         <div className="flex flex-col text-right">
+             <span className="text-xs text-gray-400 leading-none">Bem-vindo(a)</span>
+             <span className="text-sm font-bold text-white leading-tight truncate max-w-[150px]">{currentDriver.name}</span>
         </div>
       </div>
 
@@ -213,7 +227,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             </div>
           ) : (
             <div className="bg-gray-700/80 rounded-lg p-2 mb-4 backdrop-blur-sm border border-gray-600">
-                <h3 className="font-bold text-white mb-2 text-center text-xs uppercase tracking-wider">Localização</h3>
                 <div className="relative w-full aspect-square rounded-md overflow-hidden bg-gray-800 flex items-center justify-center border border-gray-600 shadow-inner">
                 {isLocationLoading ? (
                     <div className="text-center text-gray-400 text-xs">
@@ -232,6 +245,25 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             </div>
           )}
           
+          {/* Driver Card Info */}
+          <div className="bg-gray-800/80 p-4 rounded-xl border border-gray-700 flex items-center justify-between shadow-lg">
+              <div>
+                  <p className="text-orange-500 font-semibold text-[10px] uppercase tracking-wider mb-0.5">Motorista Logado</p>
+                  <h2 className="text-xl font-bold text-white leading-tight">{currentDriver.name}</h2>
+                  <div className="flex items-center text-gray-400 text-xs mt-1">
+                      <span className="mr-2"><i className="fa-solid fa-car text-gray-500 mr-1"></i>{currentDriver.carModel}</span>
+                      <span className="bg-gray-900 px-1.5 py-0.5 rounded border border-gray-600 font-mono text-orange-400">{currentDriver.licensePlate}</span>
+                  </div>
+              </div>
+              <div className="w-12 h-12 rounded-full bg-gray-700 border-2 border-orange-500 flex items-center justify-center shadow-[0_0_10px_rgba(249,115,22,0.3)] overflow-hidden">
+                 {currentDriver.photoUrl ? (
+                    <img src={currentDriver.photoUrl} alt="Motorista" className="w-full h-full object-cover" />
+                 ) : (
+                    <i className="fa-solid fa-user-astronaut text-xl text-gray-300"></i>
+                 )}
+              </div>
+          </div>
+
           <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700 space-y-4 relative">
               <h3 className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-2">Dados do Passageiro</h3>
               
@@ -246,7 +278,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                   value={passenger.name}
                   onChange={handleNameChange}
                   onFocus={handleInputFocus}
-                  className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 backdrop-blur-sm border border-gray-600"
+                  className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 backdrop-blur-sm border border-gray-600 font-bold"
                   autoComplete="off"
                 />
                 
@@ -299,6 +331,8 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
           <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700 space-y-4">
             <h3 className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-2">Destino e Tarifa</h3>
+            
+            {/* City Selection */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <i className="fa-solid fa-city text-gray-400"></i>
@@ -316,27 +350,45 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
               </select>
             </div>
 
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <PinIcon className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder={destinationCity ? `Endereço em ${destinationCity}` : "Selecione a cidade primeiro"}
-                value={destinationAddress}
-                onChange={(e) => setDestinationAddress(e.target.value)}
-                onFocus={handleInputFocus}
-                className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 border border-gray-600"
-                autoComplete="off"
-                disabled={!destinationCity}
-              />
-              {destSuggestions.length > 0 && (
-                <ul className="absolute z-20 w-full mt-1 bg-gray-700 rounded-lg shadow-xl max-h-40 overflow-y-auto border border-gray-600">
-                  {destSuggestions.map((s, i) => (
-                    <li key={i} onClick={() => handleDestSuggestionClick(s)} className="px-4 py-3 text-white cursor-pointer hover:bg-gray-600 border-b border-gray-600 last:border-0">{s.description}</li>
-                  ))}
-                </ul>
-              )}
+            {/* Address Field Split: Street + Number */}
+            <div className="flex gap-2">
+                {/* Street Input */}
+                <div className="relative flex-grow">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <PinIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                        type="text"
+                        placeholder={destinationCity ? `Rua / Avenida` : "Rua"}
+                        value={destinationAddress}
+                        onChange={(e) => setDestinationAddress(e.target.value)}
+                        onFocus={handleInputFocus}
+                        className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 border border-gray-600"
+                        autoComplete="off"
+                        disabled={!destinationCity}
+                    />
+                    {destSuggestions.length > 0 && (
+                        <ul className="absolute z-20 w-full mt-1 bg-gray-700 rounded-lg shadow-xl max-h-40 overflow-y-auto border border-gray-600">
+                        {destSuggestions.map((s, i) => (
+                            <li key={i} onClick={() => handleDestSuggestionClick(s)} className="px-4 py-3 text-white cursor-pointer hover:bg-gray-600 border-b border-gray-600 last:border-0">{s.description}</li>
+                        ))}
+                        </ul>
+                    )}
+                </div>
+
+                {/* Number Input */}
+                <div className="relative w-24 flex-shrink-0">
+                    <input
+                        type="text"
+                        placeholder="Nº"
+                        value={destinationNumber}
+                        onChange={(e) => setDestinationNumber(e.target.value)}
+                        onFocus={handleInputFocus}
+                        className="bg-gray-700/80 p-3 w-full text-center text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 border border-gray-600"
+                        autoComplete="off"
+                        disabled={!destinationCity}
+                    />
+                </div>
             </div>
             
             {currentFareRule && (

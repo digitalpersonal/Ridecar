@@ -1,17 +1,18 @@
 
 import React from 'react';
 
-// LOGO ATUALIZADA: FOTO REAL DE FRENTE COM NEON
-export const RideCarLogo = ({ className }: { className?: string }) => {
-  // Determine text size based on container size
-  const isSmall = className?.includes('w-32') || className?.includes('w-28');
-  const textSize = isSmall ? 'text-4xl' : 'text-5xl';
-  const showText = !className || className.includes('w-40') || isSmall;
-
+// LOGO ATUALIZADA: Suporte a Layout Horizontal e Vertical
+export const RideCarLogo = ({ className, horizontal = false, textSize }: { className?: string, horizontal?: boolean, textSize?: string }) => {
+  // Determine text size based on container size and layout if not provided explicitly
+  const isSmall = className?.includes('w-') || horizontal;
+  
+  // Ajuste de tamanho de texto: Usa a prop 'textSize' se existir, senão calcula o padrão
+  const finalTextSize = textSize || (horizontal ? 'text-2xl' : (isSmall ? 'text-4xl' : 'text-5xl'));
+  
   return (
-    <div className={`flex flex-col items-center justify-center ${className || 'w-40 h-40'}`}>
+    <div className={`flex ${horizontal ? 'flex-row gap-4' : 'flex-col'} items-center justify-center ${className || 'w-40 h-40'}`}>
         {/* Círculo Preto com Borda Neon Laranja */}
-        <div className="relative w-full h-full rounded-full border-[2px] md:border-[4px] border-orange-500 bg-black overflow-hidden shadow-[0_0_15px_rgba(249,115,22,0.6)] z-10 shrink-0 flex items-center justify-center aspect-square">
+        <div className={`relative rounded-full border-[2px] border-orange-500 bg-black overflow-hidden shadow-[0_0_10px_rgba(249,115,22,0.6)] z-10 shrink-0 flex items-center justify-center aspect-square ${horizontal ? 'h-full w-auto aspect-square' : 'w-full h-full'}`}>
             <img 
                 /* Foto de um carro esportivo escuro de frente */
                 src="https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=500&auto=format&fit=crop" 
@@ -20,12 +21,10 @@ export const RideCarLogo = ({ className }: { className?: string }) => {
             />
         </div>
         
-        {/* Texto RideCar Embaixo */}
-        {showText && (
-            <h1 className={`mt-3 ${textSize} font-black italic tracking-tighter text-white drop-shadow-2xl`} style={{ fontFamily: 'sans-serif', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
-                Ride<span className="text-orange-500" style={{ textShadow: '0 0 15px rgba(249,115,22,0.8)' }}>Car</span>
-            </h1>
-        )}
+        {/* Texto RideCar */}
+        <h1 className={`${horizontal ? '' : 'mt-3'} ${finalTextSize} font-black italic tracking-tighter text-white drop-shadow-2xl`} style={{ fontFamily: 'sans-serif', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
+            Ride<span className="text-orange-500" style={{ textShadow: '0 0 15px rgba(249,115,22,0.8)' }}>Car</span>
+        </h1>
     </div>
   );
 };

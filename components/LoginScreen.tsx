@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { RideCarLogo } from './icons';
 import Footer from './Footer';
@@ -32,19 +33,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/90 z-0"></div>
 
             {/* Conteúdo principal */}
-            <div className="relative z-10 flex-grow flex flex-col items-center justify-start pt-10 px-6 text-center">
+            <div className="relative z-10 flex-grow flex flex-col items-center justify-start pt-16 px-6 text-center">
                 
-                {/* Logo Centralizada */}
-                <div className="mb-4">
-                     {/* Reduzido para w-32 (aprox 128px) */}
-                     <RideCarLogo className="w-32 h-32" />
+                {/* Logo Centralizada e Horizontal */}
+                <div className="mb-8 flex justify-center w-full">
+                     {/* Horizontal: Círculo à esquerda, Texto à direita */}
+                     <RideCarLogo className="h-24 w-auto" horizontal={true} textSize="text-5xl" />
                 </div>
                 
-                <h2 className="text-xl font-medium text-gray-200 mb-6 max-w-xs drop-shadow-lg" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                <h2 className="text-xl font-medium text-gray-200 mb-8 max-w-xs drop-shadow-lg mx-auto" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
                     Ferramenta de gestão para motoristas profissionais.
                 </h2>
 
-                <div className="w-full max-w-sm">
+                <div className="w-full max-w-sm mx-auto">
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="relative">
                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -80,10 +81,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                         )}
                         
                         {/* Botão Centralizado */}
-                        <div className="pt-2">
+                        <div className="pt-4">
                             <button
                                 type="submit"
-                                className="mx-auto block w-auto bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold py-3 px-12 rounded-full transition-all hover:from-orange-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-orange-500 shadow-lg shadow-orange-500/30 transform hover:-translate-y-0.5 border border-orange-400/20"
+                                className="mx-auto block w-full bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold py-4 px-12 rounded-full transition-all hover:from-orange-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-orange-500 shadow-lg shadow-orange-500/30 transform hover:-translate-y-0.5 border border-orange-400/20 text-lg"
                             >
                                 Entrar no Sistema
                             </button>

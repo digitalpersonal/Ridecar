@@ -1,38 +1,62 @@
 
 import React, { useState } from 'react';
-import type { Driver } from '../../types';
+import type { Driver, FareRule } from '../../types';
 import { UserIcon, CarIcon, PinIcon } from '../icons';
 
 interface ManageDriversProps {
   drivers: Driver[];
+  fareRules: FareRule[];
   onSave: (drivers: Driver[]) => void;
 }
 
-const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
+const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSave }) => {
   // Only show regular drivers, not admins
   const regularDrivers = drivers.filter(d => d.role !== 'admin');
   
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Omit<Driver, 'id' | 'role'>>({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: ''});
+  const [formData, setFormData] = useState<Omit<Driver, 'id' | 'role'>>({ 
+    name: '', email: '', password: '', carModel: '', licensePlate: '', city: '', pixKey: '', photoUrl: ''
+  });
   const [error, setError] = useState<string | null>(null);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setError(null); // Clear error on edit
   };
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Limite básico de tamanho (ex: 2MB) para não pesar o banco se usar Base64
+      if (file.size > 2 * 1024 * 1024) {
+          setError("A imagem é muito grande. Escolha uma foto com menos de 2MB.");
+          return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
+        setError(null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleCancel = () => {
     setIsFormVisible(false);
     setEditingDriverId(null);
-    setFormData({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: ''});
+    setFormData({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: '', pixKey: '', photoUrl: '' });
     setError(null);
   };
 
   const handleAddNewClick = () => {
     setEditingDriverId(null);
-    setFormData({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: ''});
+    // Tenta definir Guaranésia como padrão, senão pega a primeira da lista, senão vazio
+    const defaultCity = fareRules.find(r => r.destinationCity === 'Guaranésia')?.destinationCity || (fareRules.length > 0 ? fareRules[0].destinationCity : '');
+    
+    setFormData({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: defaultCity, pixKey: '', photoUrl: '' });
     setIsFormVisible(true);
     setError(null);
   };
@@ -45,7 +69,9 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
         password: driver.password || '',
         carModel: driver.carModel,
         licensePlate: driver.licensePlate,
-        city: driver.city
+        city: driver.city,
+        pixKey: driver.pixKey || '',
+        photoUrl: driver.photoUrl || ''
     });
     setIsFormVisible(true);
     setError(null);
@@ -100,6 +126,9 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
 
   const isFormValid = formData.name.trim() && formData.email.trim() && formData.password?.trim() && formData.carModel.trim() && formData.licensePlate.trim() && formData.city.trim();
 
+  // Ordena cidades para o select
+  const availableCities = [...fareRules].sort((a, b) => a.destinationCity.localeCompare(b.destinationCity));
+
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -118,11 +147,13 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
       
       {isFormVisible && (
         <div className="bg-gray-700/80 border border-orange-500/30 p-6 rounded-xl mb-8 shadow-xl">
-          <h4 className="text-lg font-bold text-white mb-6 flex items-center">
-              <span className="bg-orange-500 w-8 h-8 rounded-full flex items-center justify-center mr-3">
-                  <i className={`fa-solid ${editingDriverId ? 'fa-pencil' : 'fa-user-plus'} text-sm`}></i>
+          <h4 className="text-lg font-bold text-white mb-6 flex items-center justify-between">
+              <span className="flex items-center">
+                <span className="bg-orange-500 w-8 h-8 rounded-full flex items-center justify-center mr-3">
+                    <i className={`fa-solid ${editingDriverId ? 'fa-pencil' : 'fa-user-plus'} text-sm`}></i>
+                </span>
+                {editingDriverId ? 'Editar Dados do Motorista' : 'Novo Cadastro de Motorista'}
               </span>
-              {editingDriverId ? 'Editar Dados do Motorista' : 'Novo Cadastro de Motorista'}
           </h4>
           
           {error && (
@@ -133,6 +164,31 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+             {/* Área de Upload de Foto */}
+             <div className="flex flex-col items-center mb-6">
+                <div className="relative group cursor-pointer w-32 h-32">
+                    <div className="w-full h-full rounded-full overflow-hidden border-4 border-gray-600 group-hover:border-orange-500 transition-colors bg-gray-800 flex items-center justify-center shadow-lg">
+                        {formData.photoUrl ? (
+                            <img src={formData.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                            <i className="fa-solid fa-camera text-4xl text-gray-500"></i>
+                        )}
+                    </div>
+                    {/* Input invisível cobrindo a área */}
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handlePhotoChange} 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                        title="Clique para enviar uma foto"
+                    />
+                    <div className="absolute bottom-1 right-1 bg-orange-500 rounded-full p-2 border-2 border-gray-700 z-0 shadow-md">
+                        <i className="fa-solid fa-pen text-white text-xs"></i>
+                    </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">Clique para enviar a foto (Máx 2MB)</p>
+             </div>
+
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -164,19 +220,34 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
                 </div>
              </div>
 
-             <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <i className="fa-solid fa-key text-gray-400"></i>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i className="fa-solid fa-key text-gray-400"></i>
+                    </div>
+                    <input
+                    type="text"
+                    name="password"
+                    placeholder="Senha de Acesso"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="bg-gray-800 border border-gray-600 p-3 pl-10 w-full text-white placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all font-mono"
+                    required
+                    />
                 </div>
-                <input
-                  type="text"
-                  name="password"
-                  placeholder="Senha de Acesso"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="bg-gray-800 border border-gray-600 p-3 pl-10 w-full text-white placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all font-mono"
-                  required
-                />
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i className="fa-brands fa-pix text-gray-400"></i>
+                    </div>
+                    <input
+                    type="text"
+                    name="pixKey"
+                    placeholder="Chave PIX (CPF, Email, Tel...)"
+                    value={formData.pixKey || ''}
+                    onChange={handleInputChange}
+                    className="bg-gray-800 border border-gray-600 p-3 pl-10 w-full text-white placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    />
+                </div>
             </div>
 
             <div className="border-t border-gray-600 my-4 pt-4">
@@ -214,15 +285,25 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <PinIcon className="h-5 w-5 text-gray-400" />
                         </div>
-                        <input
-                        type="text"
-                        name="city"
-                        placeholder="Cidade Base"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        className="bg-gray-800 border border-gray-600 p-3 pl-10 w-full text-white placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                        required
-                        />
+                        
+                        {/* Select para a cidade baseado nas tarifas */}
+                        <select
+                            name="city"
+                            value={formData.city}
+                            onChange={handleInputChange}
+                            className="bg-gray-800 border border-gray-600 p-3 pl-10 w-full text-white placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all appearance-none"
+                            required
+                        >
+                             <option value="">Selecione a cidade...</option>
+                             {availableCities.map((rule) => (
+                                 <option key={rule.id} value={rule.destinationCity}>
+                                     {rule.destinationCity}
+                                 </option>
+                             ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                             <i className="fa-solid fa-chevron-down text-xs"></i>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -252,28 +333,47 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {regularDrivers.map((driver) => (
             <div key={driver.id} className="bg-gray-800 border border-gray-700 p-5 rounded-xl flex flex-col justify-between hover:border-gray-500 transition-colors shadow-lg">
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-bold text-white text-lg">{driver.name}</h5>
-                    <span className="bg-gray-700 text-xs px-2 py-1 rounded text-gray-300 border border-gray-600">Motorista</span>
+              <div className="flex flex-col items-center text-center">
+                <div className="w-20 h-20 rounded-full bg-gray-700 border-2 border-orange-500 mb-3 overflow-hidden shadow-lg">
+                    {driver.photoUrl ? (
+                        <img src={driver.photoUrl} alt={driver.name} className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                            <i className="fa-solid fa-user-astronaut text-3xl text-gray-400"></i>
+                        </div>
+                    )}
                 </div>
-                 <p className="text-sm text-gray-400 mb-4 flex items-center">
-                    <i className="fa-solid fa-envelope mr-2 text-gray-500"></i>
-                    {driver.email}
-                 </p>
-                 
-                 <div className="bg-gray-900/50 rounded-lg p-3 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Veículo</span>
-                        <span className="text-gray-300">{driver.carModel}</span>
+
+                <div className="w-full">
+                    <div className="flex justify-center items-center mb-1">
+                        <h5 className="font-bold text-white text-lg">{driver.name}</h5>
                     </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Placa</span>
-                        <span className="text-gray-300 font-mono uppercase">{driver.licensePlate}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Cidade</span>
-                        <span className="text-gray-300">{driver.city}</span>
+                    <span className="bg-gray-700 text-xs px-2 py-0.5 rounded text-gray-300 border border-gray-600 inline-block mb-3">Motorista</span>
+                    
+                    <p className="text-sm text-gray-400 mb-4 flex items-center justify-center">
+                        <i className="fa-solid fa-envelope mr-2 text-gray-500"></i>
+                        {driver.email}
+                    </p>
+                    
+                    <div className="bg-gray-900/50 rounded-lg p-3 space-y-2 text-sm text-left">
+                        {driver.pixKey && (
+                            <div className="flex justify-between border-b border-gray-800 pb-2 mb-2">
+                                <span className="text-gray-500">Chave PIX</span>
+                                <span className="text-green-400 font-medium truncate ml-2">{driver.pixKey}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Veículo</span>
+                            <span className="text-gray-300">{driver.carModel}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Placa</span>
+                            <span className="text-gray-300 font-mono uppercase">{driver.licensePlate}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Cidade</span>
+                            <span className="text-gray-300">{driver.city}</span>
+                        </div>
                     </div>
                  </div>
               </div>

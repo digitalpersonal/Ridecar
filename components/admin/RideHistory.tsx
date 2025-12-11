@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { Ride } from '../../types';
+import type { Ride, Driver } from '../../types';
 
 declare const L: any;
 
 interface RideHistoryProps {
   rideHistory: Ride[];
+  currentDriver: Driver | null;
 }
 
 const RideHistoryMap: React.FC<{rides: Ride[]}> = ({ rides }) => {
@@ -29,23 +30,31 @@ const RideHistoryMap: React.FC<{rides: Ride[]}> = ({ rides }) => {
             }).addTo(map);
             
             mapInstanceRef.current = map;
+        }
 
+        const map = mapInstanceRef.current;
+        if (map && rides.length > 0) {
+             // Limpar marcadores antigos se houver (neste setup simples recriamos o mapa ou groups, mas aqui focamos no init)
+             // Para uma implementação perfeita de updates, usariamos um LayerGroup.
+             // Como o componente remonta ao mudar a tab, funciona ok.
+
+            const markers = L.markerClusterGroup();
             const validRides = rides.filter(ride => ride.startLocation);
+
+            validRides.forEach(ride => {
+                const marker = L.marker([ride.startLocation!.latitude, ride.startLocation!.longitude]);
+                marker.bindPopup(`
+                    <b>Passageiro:</b> ${ride.passenger.name}<br/>
+                    <b>Destino:</b> ${ride.destination.city}<br/>
+                    <b>Valor:</b> R$${ride.fare.toFixed(2)}<br/>
+                    <b>Data:</b> ${new Date(ride.startTime).toLocaleDateString('pt-BR')}
+                `);
+                markers.addLayer(marker);
+            });
+            
+            map.addLayer(markers);
             if (validRides.length > 0) {
-                const markers = L.markerClusterGroup();
-                validRides.forEach(ride => {
-                    const marker = L.marker([ride.startLocation!.latitude, ride.startLocation!.longitude]);
-                    marker.bindPopup(`
-                        <b>Passageiro:</b> ${ride.passenger.name}<br/>
-                        <b>Destino:</b> ${ride.destination.city}<br/>
-                        <b>Valor:</b> R$${ride.fare.toFixed(2)}<br/>
-                        <b>Data:</b> ${new Date(ride.startTime).toLocaleDateString('pt-BR')}
-                    `);
-                    markers.addLayer(marker);
-                });
-                
-                map.addLayer(markers);
-                map.fitBounds(markers.getBounds(), { padding: [50, 50] });
+                 map.fitBounds(markers.getBounds(), { padding: [50, 50] });
             }
         }
     }, [rides]);
@@ -54,9 +63,16 @@ const RideHistoryMap: React.FC<{rides: Ride[]}> = ({ rides }) => {
 };
 
 
-const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory }) => {
+const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory, currentDriver }) => {
   const [view, setView] = useState<'list' | 'map'>('list');
   const [expandedRideId, setExpandedRideId] = useState<string | null>(null);
+
+  const isAdmin = currentDriver?.role === 'admin';
+
+  // Filter rides: Admin sees all, Driver sees own
+  const filteredHistory = isAdmin 
+    ? rideHistory 
+    : rideHistory.filter(r => r.driverId === currentDriver?.id);
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString('pt-BR', {
@@ -80,8 +96,13 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory }) => {
       setExpandedRideId(prev => prev === rideId ? null : rideId);
   };
 
-  if (rideHistory.length === 0) {
-    return <p className="text-gray-400 text-center mt-8">Nenhuma corrida no histórico ainda.</p>;
+  if (filteredHistory.length === 0) {
+    return (
+        <div className="text-center py-12">
+            <i className="fa-solid fa-road text-4xl text-gray-600 mb-4"></i>
+            <p className="text-gray-400">Nenhuma corrida encontrada no histórico.</p>
+        </div>
+    );
   }
 
   const ViewToggle = () => (
@@ -106,7 +127,10 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory }) => {
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h3 className="text-2xl font-semibold text-white">Histórico de Corridas</h3>
+        <div>
+            <h3 className="text-2xl font-semibold text-white">Histórico de Corridas</h3>
+            {!isAdmin && <p className="text-sm text-gray-400">Suas viagens realizadas</p>}
+        </div>
         <div className="w-full md:w-auto">
             <ViewToggle />
         </div>
@@ -114,7 +138,7 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory }) => {
       
       {view === 'list' ? (
         <div className="space-y-4">
-          {[...rideHistory].reverse().map((ride, index) => {
+          {[...filteredHistory].reverse().map((ride, index) => {
             const isExpanded = expandedRideId === ride.id;
             return (
                 <div 
@@ -143,7 +167,7 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory }) => {
 
                     {/* Detalhes Expandidos */}
                     {isExpanded && (
-                        <div className="bg-gray-800/50 p-4 border-t border-gray-600 animate-fadeIn">
+                        <div className="bg-gray-800/50 p-4 border-t border-gray-600 animate-fadeIn cursor-auto" onClick={(e) => e.stopPropagation()}>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 
                                 {/* Coluna 1: Passageiro */}
@@ -157,7 +181,6 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory }) => {
                                             target="_blank" 
                                             rel="noopener noreferrer"
                                             className="text-green-400 hover:text-green-300 hover:underline"
-                                            onClick={(e) => e.stopPropagation()}
                                         >
                                             <i className="fa-brands fa-whatsapp mr-1"></i>
                                             {ride.passenger.whatsapp}
@@ -218,7 +241,7 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory }) => {
         </div>
       ) : (
         <div className="h-[60vh] bg-gray-900 rounded-lg overflow-hidden shadow-lg border border-gray-700">
-            <RideHistoryMap rides={rideHistory} />
+            <RideHistoryMap rides={filteredHistory} />
         </div>
       )}
     </div>
