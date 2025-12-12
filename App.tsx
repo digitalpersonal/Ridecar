@@ -304,9 +304,9 @@ function App() {
               }))
           );
           if (error) throw error;
-      } catch (err) {
+      } catch (err: any) {
           console.error("Erro ao salvar motoristas:", err);
-          alert("Erro ao salvar no banco de dados.");
+          alert(`Erro ao salvar no banco de dados: ${err.message || err}`);
       }
   };
 

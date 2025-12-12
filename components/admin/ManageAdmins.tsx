@@ -10,6 +10,17 @@ interface ManageAdminsProps {
   currentDriverId: string;
 }
 
+// Função para gerar UUID
+const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, fareRules, onSave, currentDriverId }) => {
   // Filter specifically for users with role 'admin'
   const admins = drivers.filter(d => d.role === 'admin');
@@ -68,7 +79,7 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, fareRules, onSave,
       } else {
           // Add new admin
           const newAdmin: Driver = {
-            id: `admin_${Date.now()}`,
+            id: generateUUID(), // UUID Correto
             ...formData,
             role: 'admin'
           };

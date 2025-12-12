@@ -9,6 +9,17 @@ interface ManageDriversProps {
   onSave: (drivers: Driver[]) => void;
 }
 
+// Função para gerar UUID compatível com Postgres
+const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSave }) => {
   // Only show regular drivers, not admins
   const regularDrivers = drivers.filter(d => d.role !== 'admin');
@@ -29,7 +40,7 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Limite de tamanho (2MB) para Base64 não travar o app
+      // Limite de tamanho (2MB)
       if (file.size > 2 * 1024 * 1024) {
           setError("A imagem é muito grande. Escolha uma foto com menos de 2MB.");
           return;
@@ -53,7 +64,7 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
 
   const handleAddNewClick = () => {
     setEditingDriverId(null);
-    // Tenta definir Guaranésia como padrão, senão pega a primeira da lista
+    // Tenta definir Guaranésia como padrão, senão pega a primeira da lista, senão vazio
     const defaultCity = fareRules.find(r => r.destinationCity === 'Guaranésia')?.destinationCity || (fareRules.length > 0 ? fareRules[0].destinationCity : '');
     
     setFormData({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: defaultCity, pixKey: '', photoUrl: '' });
@@ -103,7 +114,7 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
       } else {
           // Add new driver
           const newDriver: Driver = {
-            id: `driver_${Date.now()}`,
+            id: generateUUID(), // GERA UUID CORRETO
             ...formData,
             role: 'driver' // Force role to driver
           };
