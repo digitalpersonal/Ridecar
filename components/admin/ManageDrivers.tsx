@@ -29,7 +29,7 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Limite básico de tamanho (ex: 2MB) para não pesar o banco se usar Base64
+      // Limite de tamanho (2MB) para Base64 não travar o app
       if (file.size > 2 * 1024 * 1024) {
           setError("A imagem é muito grande. Escolha uma foto com menos de 2MB.");
           return;
@@ -53,7 +53,7 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
 
   const handleAddNewClick = () => {
     setEditingDriverId(null);
-    // Tenta definir Guaranésia como padrão, senão pega a primeira da lista, senão vazio
+    // Tenta definir Guaranésia como padrão, senão pega a primeira da lista
     const defaultCity = fareRules.find(r => r.destinationCity === 'Guaranésia')?.destinationCity || (fareRules.length > 0 ? fareRules[0].destinationCity : '');
     
     setFormData({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: defaultCity, pixKey: '', photoUrl: '' });
@@ -186,7 +186,7 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
                         <i className="fa-solid fa-pen text-white text-xs"></i>
                     </div>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">Clique para enviar a foto (Máx 2MB)</p>
+                <p className="text-xs text-gray-400 mt-2">Clique na foto para alterar (Máx 2MB)</p>
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
