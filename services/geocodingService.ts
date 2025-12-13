@@ -74,13 +74,12 @@ export const getCoordinatesForAddress = async (
 };
 
 /**
- * Obtém o endereço legível a partir de coordenadas GPS (Reverse Geocoding).
- * Retorna apenas o nome da rua para visualização limpa.
+ * Obtém o endereço legível e a cidade a partir de coordenadas GPS (Reverse Geocoding).
  */
 export const getAddressFromCoordinates = async (
   latitude: number, 
   longitude: number
-): Promise<string | null> => {
+): Promise<{ address: string; city: string } | null> => {
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
@@ -91,13 +90,17 @@ export const getAddressFromCoordinates = async (
     const data = await response.json();
     if (data && data.address) {
         const addr = data.address;
-        // Prioriza mostrar apenas a rua onde o motorista está
-        const street = addr.road || addr.pedestrian || addr.highway || addr.square || addr.suburb;
         
-        if (street) return street;
+        // Prioriza mostrar apenas a rua onde o motorista está
+        const street = addr.road || addr.pedestrian || addr.highway || addr.square || addr.suburb || data.display_name.split(',')[0];
+        
+        // Tenta encontrar a cidade em vários campos possíveis do Nominatim
+        const city = addr.city || addr.town || addr.village || addr.municipality || addr.administrative || '';
 
-        // Se falhar, pega o nome curto
-        return data.display_name.split(',')[0];
+        return {
+            address: street,
+            city: city
+        };
     }
     return null;
   } catch (error) {

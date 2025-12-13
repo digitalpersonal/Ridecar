@@ -12,7 +12,9 @@ interface RideHistoryProps {
 const RideHistoryMap: React.FC<{rides: Ride[]}> = ({ rides }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
+    const clusterGroupRef = useRef<any>(null); // Referência persistente para o grupo de clusters
 
+    // 1. Inicialização do Mapa (Roda apenas uma vez)
     useEffect(() => {
         if (mapContainerRef.current && !mapInstanceRef.current) {
             const map = L.map(mapContainerRef.current, {
@@ -22,39 +24,66 @@ const RideHistoryMap: React.FC<{rides: Ride[]}> = ({ rides }) => {
                 attributionControl: true,
             });
             
-            // Changed to Light tiles (Positron)
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
                 subdomains: 'abcd',
                 maxZoom: 20
             }).addTo(map);
             
+            // Inicializa o grupo de clusters vazio e adiciona ao mapa
+            const markers = L.markerClusterGroup({
+                showCoverageOnHover: false,
+                maxClusterRadius: 50, // Agrupa marcadores num raio de 50 pixels
+            });
+            map.addLayer(markers);
+            
+            clusterGroupRef.current = markers;
             mapInstanceRef.current = map;
         }
+    }, []);
 
+    // 2. Atualização dos Marcadores (Roda quando a lista de rides muda)
+    useEffect(() => {
         const map = mapInstanceRef.current;
-        if (map && rides.length > 0) {
-             // Limpar marcadores antigos se houver (neste setup simples recriamos o mapa ou groups, mas aqui focamos no init)
-             // Para uma implementação perfeita de updates, usariamos um LayerGroup.
-             // Como o componente remonta ao mudar a tab, funciona ok.
+        const clusterGroup = clusterGroupRef.current;
 
-            const markers = L.markerClusterGroup();
+        if (map && clusterGroup) {
+             // Limpa marcadores antigos para evitar duplicatas e vazamento de memória
+             clusterGroup.clearLayers();
+
             const validRides = rides.filter(ride => ride.startLocation);
 
-            validRides.forEach(ride => {
-                const marker = L.marker([ride.startLocation!.latitude, ride.startLocation!.longitude]);
-                marker.bindPopup(`
-                    <b>Passageiro:</b> ${ride.passenger.name}<br/>
-                    <b>Destino:</b> ${ride.destination.city}<br/>
-                    <b>Valor:</b> R$${ride.fare.toFixed(2)}<br/>
-                    <b>Data:</b> ${new Date(ride.startTime).toLocaleDateString('pt-BR')}
-                `);
-                markers.addLayer(marker);
-            });
-            
-            map.addLayer(markers);
             if (validRides.length > 0) {
-                 map.fitBounds(markers.getBounds(), { padding: [50, 50] });
+                const markersToAdd: any[] = [];
+
+                validRides.forEach(ride => {
+                    const marker = L.marker([ride.startLocation!.latitude, ride.startLocation!.longitude]);
+                    
+                    const dateStr = new Date(ride.startTime).toLocaleDateString('pt-BR');
+                    const popupContent = `
+                        <div class="p-2 text-gray-800 min-w-[150px]">
+                            <h4 class="font-bold text-sm border-b border-gray-300 pb-1 mb-1">${ride.passenger.name}</h4>
+                            <p class="text-xs mb-1"><b>Destino:</b> <br/>${ride.destination.city}</p>
+                            <div class="flex justify-between items-center mt-2">
+                                <span class="text-xs font-mono bg-gray-100 px-1 rounded">${dateStr}</span>
+                                <span class="font-bold text-orange-600">R$${ride.fare.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    marker.bindPopup(popupContent);
+                    markersToAdd.push(marker);
+                });
+                
+                // Adiciona todos os novos marcadores de uma vez (Bulk add é mais performático)
+                clusterGroup.addLayers(markersToAdd);
+                
+                // Ajusta o zoom para mostrar todos os marcadores
+                try {
+                    map.fitBounds(clusterGroup.getBounds(), { padding: [50, 50] });
+                } catch (e) {
+                    console.warn("Could not fit bounds (possibly single point or invalid bounds)", e);
+                }
             }
         }
     }, [rides]);

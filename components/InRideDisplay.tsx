@@ -25,6 +25,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
   
   // Estado para o endereço de origem
   const [startAddress, setStartAddress] = useState<string>('Buscando endereço...');
+  const [startCity, setStartCity] = useState<string>('');
 
   // Edit Destination State
   const [isEditingDest, setIsEditingDest] = useState(false);
@@ -40,14 +41,17 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
   useEffect(() => {
     const fetchStartAddress = async () => {
       if (ride.startLocation) {
-        const address = await getAddressFromCoordinates(ride.startLocation.latitude, ride.startLocation.longitude);
-        if (address) {
-          setStartAddress(address);
+        const result = await getAddressFromCoordinates(ride.startLocation.latitude, ride.startLocation.longitude);
+        if (result) {
+          setStartAddress(result.address);
+          setStartCity(result.city);
         } else {
           setStartAddress(`${ride.startLocation.latitude.toFixed(4)}, ${ride.startLocation.longitude.toFixed(4)}`);
+          setStartCity('');
         }
       } else {
         setStartAddress('Localização desconhecida');
+        setStartCity('');
       }
     };
     fetchStartAddress();
@@ -256,6 +260,9 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
                     <p className="text-white font-medium text-sm truncate" title={startAddress}>
                         {startAddress}
                     </p>
+                    {startCity && (
+                        <p className="text-xs text-gray-400">{startCity}</p>
+                    )}
                 </div>
            </div>
 
