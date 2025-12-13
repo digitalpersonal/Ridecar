@@ -19,10 +19,16 @@ interface StartRideFormProps {
 
 const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartRide, onNavigateToAdmin, currentDriver, onLogout, fareRules }) => {
   const [passenger, setPassenger] = useState<Passenger>({ name: '', whatsapp: '', cpf: '' });
+  
+  // Destination States
   const [destinationAddress, setDestinationAddress] = useState('');
-  const [destinationNumber, setDestinationNumber] = useState(''); // New state for street number
+  const [destinationNumber, setDestinationNumber] = useState(''); 
   const [destinationCity, setDestinationCity] = useState('');
   
+  // Custom Destination States
+  const [isCustomDest, setIsCustomDest] = useState(false);
+  const [customFare, setCustomFare] = useState('');
+
   // Suggestion States
   const [destSuggestions, setDestSuggestions] = useState<AddressSuggestion[]>([]);
   const [passengerSuggestions, setPassengerSuggestions] = useState<Passenger[]>([]);
@@ -37,7 +43,9 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
   const { location, isLoading: isLocationLoading, error: locationError } = useGeolocation();
   
   const availableDestinations = [...fareRules].sort((a, b) => a.destinationCity.localeCompare(b.destinationCity));
-  const currentFareRule = availableDestinations.find(rule => rule.destinationCity === destinationCity);
+  
+  // Se não for custom, tenta achar a regra. Se for custom, a regra é null.
+  const currentFareRule = !isCustomDest ? availableDestinations.find(rule => rule.destinationCity === destinationCity) : null;
 
   // Effect: Fetch Address Suggestions
   useEffect(() => {
@@ -60,7 +68,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
           const matches = savedPassengers.filter(p => 
               p.name.toLowerCase().includes(debouncedPassengerName.toLowerCase())
           );
-          // Only show if it's not an exact match preventing the menu from closing
           if (matches.length > 0 && matches[0].name !== debouncedPassengerName) {
             setPassengerSuggestions(matches);
           } else {
@@ -82,7 +89,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
-    // Just update the text, suggestions appear via useEffect
     setPassenger(prev => ({ ...prev, name: newName }));
   };
 
@@ -96,36 +102,64 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     setDestSuggestions([]);
   };
 
+  const toggleCustomDest = () => {
+      setIsCustomDest(!isCustomDest);
+      // Limpa os campos para evitar confusão
+      setDestinationCity('');
+      setDestinationAddress('');
+      setDestinationNumber('');
+      setCustomFare('');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Combine street and number
-    const fullAddress = destinationNumber.trim() 
-        ? `${destinationAddress}, ${destinationNumber}` 
-        : destinationAddress;
+    // Tratamento do Endereço
+    // Se for customizado e o endereço estiver vazio, usa o nome da cidade como endereço (para o mapa achar o centro)
+    let finalAddress = destinationAddress;
+    
+    if (!finalAddress.trim()) {
+        finalAddress = "Centro";
+    }
 
-    if (passenger.name && passenger.whatsapp && destinationAddress && destinationCity && location && currentFareRule) {
+    // Combine street and number if number exists
+    const fullAddress = destinationNumber.trim() 
+        ? `${finalAddress}, ${destinationNumber}` 
+        : finalAddress;
+
+    // Determina o valor final (Regra ou Manual)
+    const finalFare = isCustomDest 
+        ? parseFloat(customFare.replace(',', '.')) 
+        : (currentFareRule ? currentFareRule.fare : 0);
+
+    if (passenger.name && passenger.whatsapp && destinationCity && location && finalFare > 0) {
       onStartRide(
         passenger, 
         { address: fullAddress, city: destinationCity }, 
         location,
-        currentFareRule.fare
+        finalFare
       );
     }
   };
 
-  const isFormValid = passenger.name.trim() && passenger.whatsapp.trim() && destinationAddress.trim() && destinationCity.trim() && !!location && !!currentFareRule;
+  // Validação do Formulário
+  const isPassengerValid = passenger.name.trim() && passenger.whatsapp.trim();
+  
+  // Lógica de validação do destino
+  const isDestinationValid = isCustomDest 
+      ? (destinationCity.trim() && customFare && !isNaN(parseFloat(customFare.replace(',', '.')))) // Custom: Cidade + Valor obrigatórios, Endereço opcional
+      : (destinationCity.trim() && !!currentFareRule && destinationAddress.trim()); // Padrão: Cidade + Regra + Endereço obrigatórios
+
+  const isFormValid = isPassengerValid && isDestinationValid && !!location;
 
   // Sidebar Component
   const Sidebar = () => (
       <>
-        {/* Overlay */}
         <div 
             className={`fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${isMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             onClick={() => setIsMenuOpen(false)}
         />
         
-        {/* Sidebar */}
         <div className={`fixed inset-y-0 left-0 w-64 bg-gray-800 z-50 transform transition-transform duration-300 shadow-2xl ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="p-6 border-b border-gray-700 flex items-center justify-between bg-gray-900">
                 <RideCarLogo className="h-8 w-auto" horizontal={true} />
@@ -203,13 +237,11 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             >
                 <i className="fa-solid fa-bars text-2xl"></i>
             </button>
-            {/* Logo agora fica a esquerda, junto com o menu */}
             <div className="h-10">
                  <RideCarLogo className="h-full w-auto" horizontal={true} />
             </div>
         </div>
         
-        {/* User Info Right */}
          <div className="flex flex-col text-right">
              <span className="text-xs text-gray-400 leading-none">Bem-vindo(a)</span>
              <span className="text-sm font-bold text-white leading-tight truncate max-w-[150px]">{currentDriver.name}</span>
@@ -219,7 +251,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
       <div className="flex-grow p-4 overflow-y-auto">
         <form onSubmit={handleSubmit} className="space-y-4 max-w-lg mx-auto">
           
-          {/* Location Status Inline Block - Fix for blinking map */}
           {locationError ? (
             <div className="bg-red-900/50 border-2 border-red-500 rounded-lg p-3 mb-4 text-center backdrop-blur-sm">
                 <i className="fa-solid fa-satellite-dish text-2xl text-red-400 mb-2"></i>
@@ -245,7 +276,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             </div>
           )}
           
-          {/* Driver Card Info */}
           <div className="bg-gray-800/80 p-4 rounded-xl border border-gray-700 flex items-center justify-between shadow-lg">
               <div>
                   <p className="text-orange-500 font-semibold text-[10px] uppercase tracking-wider mb-0.5">Motorista Logado</p>
@@ -267,7 +297,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
           <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700 space-y-4 relative">
               <h3 className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-2">Dados do Passageiro</h3>
               
-              {/* Name Input with Autocomplete */}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <UserIcon className="h-5 w-5 text-gray-400" />
@@ -282,7 +311,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                   autoComplete="off"
                 />
                 
-                {/* Suggestions Dropdown */}
                 {passengerSuggestions.length > 0 && (
                      <ul className="absolute z-30 w-full mt-1 bg-gray-700 rounded-lg shadow-xl max-h-40 overflow-y-auto border border-gray-600">
                         {passengerSuggestions.map((p, i) => (
@@ -330,40 +358,61 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
           </div>
 
           <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700 space-y-4">
-            <h3 className="text-orange-500 font-semibold text-sm uppercase tracking-wider mb-2">Destino e Tarifa</h3>
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="text-orange-500 font-semibold text-sm uppercase tracking-wider">Destino e Tarifa</h3>
+                <button 
+                    type="button" 
+                    onClick={toggleCustomDest}
+                    className="text-xs text-blue-400 hover:text-white underline"
+                >
+                    {isCustomDest ? 'Selecionar da Lista' : 'Outra cidade?'}
+                </button>
+            </div>
             
-            {/* City Selection */}
+            {/* City Selection / Input */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <i className="fa-solid fa-city text-gray-400"></i>
               </div>
-              <select
-                value={destinationCity}
-                onChange={(e) => setDestinationCity(e.target.value)}
-                onFocus={handleInputFocus}
-                className="bg-gray-700/80 p-3 pl-10 w-full text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none border border-gray-600"
-              >
-                <option value="">Selecione a cidade...</option>
-                {availableDestinations.map(rule => (
-                  <option key={rule.id} value={rule.destinationCity}>{rule.destinationCity}</option>
-                ))}
-              </select>
+              
+              {!isCustomDest ? (
+                  <select
+                    value={destinationCity}
+                    onChange={(e) => setDestinationCity(e.target.value)}
+                    onFocus={handleInputFocus}
+                    className="bg-gray-700/80 p-3 pl-10 w-full text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none border border-gray-600"
+                  >
+                    <option value="">Selecione a cidade...</option>
+                    {availableDestinations.map(rule => (
+                      <option key={rule.id} value={rule.destinationCity}>{rule.destinationCity}</option>
+                    ))}
+                  </select>
+              ) : (
+                  <input
+                    type="text"
+                    placeholder="Digite o nome da cidade"
+                    value={destinationCity}
+                    onChange={(e) => setDestinationCity(e.target.value)}
+                    onFocus={handleInputFocus}
+                    className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border border-blue-500/50"
+                    autoComplete="off"
+                  />
+              )}
             </div>
 
             {/* Address Field Split: Street + Number */}
             <div className="flex gap-2">
-                {/* Street Input */}
                 <div className="relative flex-grow">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <PinIcon className="h-5 w-5 text-gray-400" />
                     </div>
                     <input
                         type="text"
-                        placeholder={destinationCity ? `Rua / Avenida` : "Rua"}
+                        placeholder={isCustomDest ? "Endereço (Opcional)" : (destinationCity ? `Rua / Avenida` : "Rua")}
                         value={destinationAddress}
                         onChange={(e) => setDestinationAddress(e.target.value)}
                         onFocus={handleInputFocus}
-                        className="bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 border border-gray-600"
+                        className={`bg-gray-700/80 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 ${isCustomDest ? 'focus:ring-blue-500' : 'focus:ring-orange-500'} border border-gray-600`}
                         autoComplete="off"
                         disabled={!destinationCity}
                     />
@@ -376,7 +425,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                     )}
                 </div>
 
-                {/* Number Input */}
                 <div className="relative w-24 flex-shrink-0">
                     <input
                         type="text"
@@ -384,25 +432,45 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                         value={destinationNumber}
                         onChange={(e) => setDestinationNumber(e.target.value)}
                         onFocus={handleInputFocus}
-                        className="bg-gray-700/80 p-3 w-full text-center text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 border border-gray-600"
+                        className={`bg-gray-700/80 p-3 w-full text-center text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 ${isCustomDest ? 'focus:ring-blue-500' : 'focus:ring-orange-500'} border border-gray-600`}
                         autoComplete="off"
                         disabled={!destinationCity}
                     />
                 </div>
             </div>
             
-            {currentFareRule && (
-              <div className="flex items-center justify-between bg-gray-900/50 p-4 rounded-lg border border-orange-500/30">
-                <span className="text-gray-300 font-medium">Valor Estimado</span>
-                <span className="text-2xl font-bold text-orange-400">R$ {currentFareRule.fare.toFixed(2)}</span>
-              </div>
+            {/* Exibição ou Input de Tarifa */}
+            {!isCustomDest ? (
+                currentFareRule && (
+                  <div className="flex items-center justify-between bg-gray-900/50 p-4 rounded-lg border border-orange-500/30">
+                    <span className="text-gray-300 font-medium">Valor Estimado</span>
+                    <span className="text-2xl font-bold text-orange-400">R$ {currentFareRule.fare.toFixed(2)}</span>
+                  </div>
+                )
+            ) : (
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i className="fa-solid fa-brazilian-real-sign text-green-500"></i>
+                    </div>
+                    <input
+                        type="number"
+                        placeholder="Valor da Corrida (R$)"
+                        value={customFare}
+                        onChange={(e) => setCustomFare(e.target.value)}
+                        className="bg-gray-900/50 p-4 pl-10 w-full text-white placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 border border-green-500/30 text-lg font-bold"
+                        step="0.01"
+                        min="0"
+                    />
+                </div>
             )}
           </div>
           
           <button
             type="submit"
             disabled={!isFormValid}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold py-4 px-4 rounded-xl disabled:from-gray-700 disabled:to-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed transition-all hover:from-orange-600 hover:to-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-orange-500 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transform active:scale-95"
+            className={`w-full text-white font-bold py-4 px-4 rounded-xl disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed transition-all shadow-lg transform active:scale-95 ${isCustomDest 
+                ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30' 
+                : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-orange-500/30'}`}
           >
             {isLocationLoading ? 'Carregando GPS...' : !location ? 'Sem GPS' : 'INICIAR CORRIDA'}
           </button>
