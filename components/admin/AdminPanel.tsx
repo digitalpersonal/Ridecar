@@ -46,9 +46,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       case 'history': return <RideHistory rideHistory={rideHistory} currentDriver={currentDriver} drivers={drivers} />;
       case 'passengers': return <ManagePassengers passengers={passengers} onSave={onSavePassengers} />;
       case 'branding': return currentDriver ? <ManageBranding currentDriver={currentDriver} onUpdate={onUpdateBranding} /> : null;
-      case 'drivers': return isAdmin ? <ManageDrivers drivers={drivers} fareRules={fareRules} onSave={onSaveDrivers} /> : null;
-      case 'admins': return isAdmin ? <ManageAdmins drivers={drivers} fareRules={fareRules} onSave={onSaveDrivers} currentDriverId={currentDriver?.id || ''} /> : null;
-      case 'fares': return isAdmin ? <ManageFares fareRules={fareRules} onSave={onSaveFareRules} /> : null;
+      case 'drivers': return isAdmin ? <ManageDrivers drivers={drivers} onSave={onSaveDrivers} /> : null;
+      case 'admins': return isAdmin ? <ManageAdmins drivers={drivers} onSave={onSaveDrivers} currentDriverId={currentDriver?.id || ''} /> : null;
       case 'financials': return <Financials rideHistory={rideHistory} drivers={drivers} currentDriver={currentDriver} />;
       default: return null;
     }
@@ -101,7 +100,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             <>
               <div className="w-px bg-gray-600 mx-2 h-8 self-center"></div>
               <TabButton tab="drivers" label="Equipe" icon="fa-car-side" restricted />
-              <TabButton tab="fares" label="Tarifas" icon="fa-tags" restricted />
               <TabButton tab="admins" label="Acessos" icon="fa-shield-halved" restricted />
             </>
           )}

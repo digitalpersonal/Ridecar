@@ -251,7 +251,6 @@ function App() {
             onNavigateToAdmin={(t) => { setInitialDashboardTab(t); setAppState(AppState.ADMIN_PANEL); }} 
             currentDriver={currentDriver} 
             onLogout={() => { setCurrentDriver(null); localStorage.clear(); window.location.reload(); }} 
-            fareRules={fareRules} 
         />
       )}
       {appState === AppState.IN_RIDE && currentRide && currentDriver && (

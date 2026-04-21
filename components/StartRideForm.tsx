@@ -15,18 +15,15 @@ interface StartRideFormProps {
   onNavigateToAdmin: (tab: string) => void;
   currentDriver: Driver;
   onLogout: () => void;
-  fareRules: FareRule[];
 }
 
-const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartRide, onNavigateToAdmin, currentDriver, onLogout, fareRules }) => {
+const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartRide, onNavigateToAdmin, currentDriver, onLogout }) => {
   const [passenger, setPassenger] = useState<Passenger>({ name: '', whatsapp: '', cpf: '' });
   const [originAddressText, setOriginAddressText] = useState('Buscando localização...');
   const [destinationAddress, setDestinationAddress] = useState('');
   const [destinationNumber, setDestinationNumber] = useState(''); 
   const [destinationCity, setDestinationCity] = useState('');
-  const [isCustomDest, setIsCustomDest] = useState(false);
   const [customFare, setCustomFare] = useState('');
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [destSuggestions, setDestSuggestions] = useState<AddressSuggestion[]>([]);
   const [passengerSuggestions, setPassengerSuggestions] = useState<Passenger[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -150,12 +147,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                     if (isValid(parsed.destinationNumber)) setDestinationNumber(String(parsed.destinationNumber));
 
                     if (hasCity) {
-                        const city = String(parsed.destinationCity);
-                        setDestinationCity(city);
-                        const isKnownCity = availableDestinations.some(d => normalize(d.destinationCity) === normalize(city));
-                        if (!isKnownCity || hasFare) setIsCustomDest(true);
-                    } else if (hasAddress || hasFare) {
-                        setIsCustomDest(true);
+                        setDestinationCity(String(parsed.destinationCity));
                     }
                     
                     if (hasFare) {
@@ -281,27 +273,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     };
   }, [effectiveLocation?.latitude, effectiveLocation?.longitude]);
 
-  const availableDestinations = (fareRules || [])
-    .filter(rule => rule && rule.destinationCity) // Remove strict originCity filtering to guarantee they show up
-    .reduce((acc, current) => {
-      const x = acc.find(item => item.destinationCity === current.destinationCity);
-      if (!x) {
-        return acc.concat([current]);
-      } else {
-        return acc;
-      }
-    }, [] as FareRule[])
-    .sort((a, b) => (a.destinationCity || "").localeCompare(b.destinationCity || ""));
-
-  // Efeito para auto-ativar modo customizado se não houver destinos cadastrados
-  useEffect(() => {
-     if (availableDestinations.length === 0) {
-         setIsCustomDest(true);
-     }
-  }, [availableDestinations.length]);
-
-  const currentFareRule = !isCustomDest ? availableDestinations.find(rule => rule.destinationCity === destinationCity) : null;
-
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (debouncedDestination.length > 2 && destinationCity) {
@@ -330,14 +301,14 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     e.preventDefault();
     let finalStreet = destinationAddress.trim() || "Centro";
     const fullAddress = destinationNumber.trim() ? `${finalStreet}, ${destinationNumber}` : finalStreet;
-    const finalFare = isCustomDest ? parseFloat(customFare.replace(',', '.')) : (currentFareRule ? currentFareRule.fare : 0);
+    const finalFare = parseFloat(customFare.replace(',', '.'));
 
     if (passenger.name && passenger.whatsapp && destinationCity && effectiveLocation && finalFare > 0) {
       onStartRide(passenger, { address: fullAddress, city: destinationCity }, effectiveLocation, finalFare, originAddressText);
     }
   };
 
-  const isFormValid = passenger.name.trim() && passenger.whatsapp.trim() && (isCustomDest ? (destinationCity.trim() && !!customFare) : (destinationCity.trim() && !!currentFareRule && destinationAddress.trim())) && !!effectiveLocation;
+  const isFormValid = passenger.name.trim() && passenger.whatsapp.trim() && destinationCity.trim() && !!customFare && !!effectiveLocation;
 
   const Sidebar = () => (
       <>
@@ -498,17 +469,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                             </div>
                             <div className="flex items-center space-x-4 shrink-0">
                                 <button 
-                                    type="button" 
-                                    onClick={() => {
-                                        const nowCustom = !isCustomDest;
-                                        setIsCustomDest(nowCustom);
-                                        if (!nowCustom) setShowCityDropdown(true);
-                                    }} 
-                                    className="text-[10px] text-gray-400 hover:text-primary font-black uppercase underline decoration-2 underline-offset-4 mr-2"
-                                >
-                                    {isCustomDest ? 'Usar Tabela' : 'Valor Avulso'}
-                                </button>
-                                <button 
                                     type="button"
                                     onClick={() => handleVoiceRecord('route')}
                                     className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-[0_0_20px_rgba(234,179,8,0.25)] hover:scale-105 active:scale-95 shrink-0 ${isRecording && activeVoiceContext === 'route' ? 'bg-red-500 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.6)]' : 'bg-primary/20 hover:bg-primary border-2 border-primary/50 text-primary hover:text-gray-900'}`}
@@ -520,44 +480,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
                         <div className="space-y-3 pl-[31px]">
                             <div className="relative">
-                                {isCustomDest ? (
-                                    <input type="text" placeholder="Cidade de destino" value={destinationCity} onChange={(e) => setDestinationCity(e.target.value)} className="bg-gray-800/80 p-4 w-full text-white rounded-2xl border border-gray-700 font-bold focus:ring-2 focus:ring-primary transition-all" />
-                                ) : (
-                                    <div className="relative z-50">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCityDropdown(!showCityDropdown)}
-                                            className="bg-gray-800/80 p-4 w-full text-left text-white rounded-2xl border border-gray-700 font-black focus:ring-2 focus:ring-primary transition-all flex justify-between items-center"
-                                        >
-                                            <span className={destinationCity ? '' : 'text-gray-400'}>{destinationCity || 'Para onde vamos? (Selecione a cidade)'}</span>
-                                            <i className={`fa-solid fa-chevron-down transition-transform ${showCityDropdown ? 'rotate-180' : ''}`}></i>
-                                        </button>
-
-                                        {showCityDropdown && (
-                                            <div className="mt-2 w-full bg-gray-800 border border-gray-700 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden">
-                                                {availableDestinations.length > 0 ? (
-                                                    <ul className="max-h-60 overflow-y-auto">
-                                                        {availableDestinations.map(rule => (
-                                                            <li 
-                                                                key={rule.id}
-                                                                onClick={() => {
-                                                                    setDestinationCity(rule.destinationCity);
-                                                                    setShowCityDropdown(false);
-                                                                }}
-                                                                className="px-5 py-4 text-sm font-bold text-white cursor-pointer hover:bg-primary/20 border-b border-gray-700/50 last:border-0 flex justify-between items-center"
-                                                            >
-                                                                <span>{rule.destinationCity}</span>
-                                                                <span className="text-gray-400 text-xs bg-gray-900 px-2 py-1 rounded border border-gray-700">R$ {rule.fare.toFixed(2)}</span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                ) : (
-                                                    <div className="p-5 text-sm text-gray-400 text-center font-medium">Nenhuma cidade cadastrada para {currentDriver?.city || 'sua origem'}</div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                <input type="text" placeholder="Cidade de destino" value={destinationCity} onChange={(e) => setDestinationCity(e.target.value)} className="bg-gray-800/80 p-4 w-full text-white rounded-2xl border border-gray-700 font-bold focus:ring-2 focus:ring-primary transition-all" />
                             </div>
 
                             <div className="flex gap-2">
@@ -576,14 +499,10 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                         </div>
                     </div>
 
-                    {isCustomDest ? (
-                        <div className="ml-[31px] flex items-center bg-gray-900/80 rounded-2xl p-2 border border-green-500/30">
-                            <span className="pl-4 font-black text-green-500">R$</span>
-                            <input type="number" placeholder="0,00" value={customFare} onChange={(e) => setCustomFare(e.target.value)} className="bg-transparent p-3 w-full text-white text-3xl font-black focus:outline-none placeholder-gray-700" />
-                        </div>
-                    ) : (
-                        currentFareRule && <div className="ml-[31px] p-5 bg-primary/20 rounded-2xl border border-primary/30 text-center font-black text-primary text-3xl italic tracking-tighter shadow-inner">R$ {currentFareRule.fare.toFixed(2)}</div>
-                    )}
+                    <div className="ml-[31px] flex items-center bg-gray-900/80 rounded-2xl p-2 border border-green-500/30">
+                        <span className="pl-4 font-black text-green-500">R$</span>
+                        <input type="number" placeholder="0,00" value={customFare} onChange={(e) => setCustomFare(e.target.value)} className="bg-transparent p-3 w-full text-white text-3xl font-black focus:outline-none placeholder-gray-700" />
+                    </div>
                 </div>
                 
                 <button type="submit" disabled={!isFormValid} className="w-full bg-primary hover:bg-primary-hover text-white font-black py-5 rounded-[20px] disabled:bg-gray-800 disabled:text-gray-600 shadow-2xl transform active:scale-[0.98] transition-all text-xl uppercase italic tracking-tighter">
