@@ -4,24 +4,9 @@ let aiInstance: any = null;
 
 const getAI = () => {
   if (!aiInstance) {
-    let apiKey = '';
-    
-    // 1. Tenta pegar do process.env (Padrao do AI Studio e Node)
-    try {
-      if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
-        apiKey = process.env.GEMINI_API_KEY;
-      }
-    } catch (e) {}
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    // 2. Tenta pegar do import.meta.env (Padrao do Vite/Vercel Client-side)
-    // Embora o skill desencoraje, para deploys externos manuais (como Vercel/Github)
-    // o Vite exige o prefixo VITE_ para expor ao cliente.
-    if (!apiKey) {
-      // @ts-ignore
-      apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-    }
-
-    if (!apiKey) {
+    if (!apiKey || apiKey === 'undefined') {
       console.warn("GEMINI_API_KEY não configurada. Funcionalidade de IA/voz desativada.");
       return null;
     }

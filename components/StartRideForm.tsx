@@ -57,8 +57,10 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     const handleVoiceRecord = (context: 'passenger' | 'route') => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         
+        console.log("BRAIN: Inicializando reconhecimento de voz...", { supported: !!SpeechRecognition });
+
         if (!SpeechRecognition) {
-            alert("Seu navegador não suporta reconhecimento de voz.");
+            alert("Seu navegador não suporta reconhecimento de voz (SpeechRecognition). No iPhone, use o Safari.");
             return;
         }
 
@@ -210,9 +212,14 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
         recognition.onerror = (event: any) => {
             console.error("Speech Recognition Error:", event.error);
+            const errorMsg = event.error === 'not-allowed' ? "Microfone bloqueado pelo navegador. Verifique as permissões de HTTPS." :
+                            event.error === 'service-not-allowed' ? "Serviço de voz não disponível." :
+                            event.error === 'network' ? "Erro de conexão/internet." : event.error;
+            
             if (event.error !== 'no-speech') {
-                setVoiceStatus("Status: " + event.error);
-                setTimeout(() => setVoiceStatus(null), 3000);
+                setVoiceStatus("Erro: " + errorMsg);
+                alert("Erro no Microfone: " + errorMsg + "\nCertifique-se que o site usa HTTPS e o acesso ao microfone foi permitido.");
+                setTimeout(() => setVoiceStatus(null), 5000);
             }
             isRecordingRef.current = false;
             setIsRecording(false);
