@@ -268,7 +268,6 @@ function App() {
               setRideHistory(p => p.map(r => r.id === currentRide.id ? { ...r, destination: nd, fare: nf } : r));
               supabase.from('rides').update({ destination_json: nd, fare: nf }).eq('id', currentRide.id);
             }} 
-            fareRules={fareRules} 
         />
       )}
       {appState === AppState.ADMIN_PANEL && (
@@ -277,33 +276,51 @@ function App() {
             passengers={savedPassengers} 
             drivers={drivers} 
             onSaveDrivers={async (l) => { 
-                const oldDriverIds = drivers.map(d => d.id);
-                const newDriverIds = l.map(d => d.id);
-                const deletedIds = oldDriverIds.filter(id => !newDriverIds.includes(id));
+                try {
+                    const oldDriverIds = drivers.map(d => d.id);
+                    const newDriverIds = l.map(d => d.id);
+                    const deletedIds = oldDriverIds.filter(id => !newDriverIds.includes(id));
 
-                setDrivers(l); 
-                
-                // 1. Upsert (Adicionar/Atualizar)
-                await supabase.from('drivers').upsert(l.map(d => ({ 
-                    id: d.id, name: d.name, email: d.email, password: d.password, 
-                    car_model: d.carModel, license_plate: d.licensePlate, city: d.city, 
-                    role: d.role, pix_key: d.pixKey, photo_url: d.photoUrl, 
-                    brand_name: d.brandName, primary_color: d.primaryColor, background_color: d.backgroundColor,
-                    custom_logo_url: d.customLogoUrl, slug: d.slug 
-                }))); 
+                    // 1. Upsert (Adicionar/Atualizar) no banco primeiro para garantir persistência
+                    const mappedData = l.map(d => ({ 
+                        id: d.id, name: d.name, email: d.email, password: d.password, 
+                        car_model: d.carModel, license_plate: d.licensePlate, city: d.city, 
+                        role: d.role, pix_key: d.pixKey, photo_url: d.photoUrl, 
+                        brand_name: d.brandName, primary_color: d.primaryColor, background_color: d.backgroundColor,
+                        custom_logo_url: d.customLogoUrl, slug: d.slug 
+                    }));
 
-                // 2. Delete (Remover os que não estão na lista nova)
-                if (deletedIds.length > 0) {
-                    console.log("DATABASE: Removendo motoristas:", deletedIds);
-                    await supabase.from('drivers').delete().in('id', deletedIds);
-                }
-                
-                if (currentDriver) {
-                    const updatedMe = l.find(d => d.id === currentDriver.id);
-                    if (updatedMe) {
-                        setCurrentDriver(updatedMe);
-                        localStorage.setItem(CURRENT_DRIVER_STORAGE_KEY, JSON.stringify(updatedMe));
+                    const { error: upsertError } = await supabase.from('drivers').upsert(mappedData);
+
+                    if (upsertError) {
+                        console.error("DATABASE ERROR (Upsert):", upsertError);
+                        alert(`Erro ao salvar no banco de dados: ${upsertError.message}`);
+                        return; // Aborta para não dessincronizar estado local com erro fixo
                     }
+
+                    // 2. Delete (Remover os que não estão na lista nova)
+                    if (deletedIds.length > 0) {
+                        const { error: deleteError } = await supabase.from('drivers').delete().in('id', deletedIds);
+                        if (deleteError) {
+                            console.error("DATABASE ERROR (Delete):", deleteError);
+                        }
+                    }
+
+                    // 3. Só após sucesso no banco, atualizamos o estado local
+                    setDrivers(l); 
+                    
+                    if (currentDriver) {
+                        const updatedMe = l.find(d => d.id === currentDriver.id);
+                        if (updatedMe) {
+                            setCurrentDriver(updatedMe);
+                            localStorage.setItem(CURRENT_DRIVER_STORAGE_KEY, JSON.stringify(updatedMe));
+                        }
+                    }
+                    alert("Alterações salvas com sucesso no banco de dados!");
+                    console.log("DATABASE: Motoristas sincronizados com sucesso.");
+                } catch (err: any) {
+                    console.error("DATABASE CRITICAL ERROR:", err);
+                    alert("Erro crítico ao processar salvamento de motoristas.");
                 }
             }} 
             onSavePassengers={setSavedPassengers} 

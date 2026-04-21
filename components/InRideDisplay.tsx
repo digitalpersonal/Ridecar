@@ -14,10 +14,9 @@ interface InRideDisplayProps {
   onSendWhatsApp: () => void;
   onComplete: () => void;
   onUpdateDestination: (destination: { address: string; city: string }, fare: number) => void;
-  fareRules: FareRule[];
 }
 
-const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide, onSendWhatsApp, onComplete, onUpdateDestination, fareRules }) => {
+const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide, onSendWhatsApp, onComplete, onUpdateDestination }) => {
   // Guard clause initial check
   if (!ride || !driver || !ride.destination || !ride.passenger) {
     console.warn("InRideDisplay: Dados incompletos. Encerrando exibição.");
@@ -44,10 +43,6 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
 
   const { distance, currentPosition, path } = useRideTracking(!isRideFinished);
   const normalize = (s: string) => s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
-
-  const availableCities = fareRules
-    .filter(rule => normalize(rule.originCity) === normalize(driver.city))
-    .sort((a, b) => a.destinationCity.localeCompare(b.destinationCity));
 
   useEffect(() => {
     const fetchDestinationCoords = async () => {
