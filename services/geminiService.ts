@@ -5,15 +5,19 @@ let aiInstance: any = null;
 const getAI = () => {
   if (!aiInstance) {
     let apiKey = '';
-    // Tenta pegar a chave injetada pelo AI Studio
+    
+    // 1. Tenta pegar do process.env (Padrao do AI Studio e Node)
     try {
       if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
         apiKey = process.env.GEMINI_API_KEY;
       }
-    } catch(e) {}
-    
-    // Tenta pegar a chave do ambiente de produção normal (Vercel)
+    } catch (e) {}
+
+    // 2. Tenta pegar do import.meta.env (Padrao do Vite/Vercel Client-side)
+    // Embora o skill desencoraje, para deploys externos manuais (como Vercel/Github)
+    // o Vite exige o prefixo VITE_ para expor ao cliente.
     if (!apiKey) {
+      // @ts-ignore
       apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     }
 
@@ -21,6 +25,7 @@ const getAI = () => {
       console.warn("GEMINI_API_KEY não configurada. Funcionalidade de IA/voz desativada.");
       return null;
     }
+    
     aiInstance = new GoogleGenAI({ apiKey });
   }
   return aiInstance;
@@ -52,32 +57,11 @@ export const parseRideInfoFromText = async (text: string, context: 'passenger' |
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: `CONTEXTO DE EXTRAÇÃO: ${contextInstruction}\nTexto: "${text}"`,
       config: {
         systemInstruction: `Você é um extrator de dados JSON de ELITE para motoristas brasileiros (Uber/99).
-        Sua missão é extrair informações de viagens a partir de áudios que podem ser confusos.
-        
-        DIRETRIZES TÉCNICAS:
-        1. DE-DUPLICAÇÃO (CRITICAL): Motoristas costumam repetir palavras ("Carlos Carlos", "nove nove"). Ignore a repetição e retorne apenas a informação uma vez.
-        2. WHATSAPP: Remova preposições ("e", "zap", "zap zap"). Se falar "zero trinta e cinco nove...", remova o zero inicial do DDD. Priorize 11 dígitos.
-        3. ENDEREÇO/CIDADE: Se o motorista falar "no hospital de passos", o endereço é "Hospital" e a cidade é "Passos". Remova "em", "no", "na", "de" que venham antes de locais.
-        4. TARIFA: Extraia apenas o número. "cinquenta conto" -> "50". "vinte e cinco e cinquenta" -> "25.50".
-        
-        REGRAS DE OURO:
-        - Se o CONTEXTO for 'passenger', deixe campos de rota como null.
-        - Se o CONTEXTO for 'route', deixe campos de passageiro como null.
-        - NUNCA invente informações. Se não houver clareza, retorne null.
-        
-        EXEMPLOS (Few-Shot):
-        - Entrada: "Carlos Carlos zap nove nove um dois três quatro cinco seis sete" (Contexto: passenger)
-          Saída: {"passengerName": "Carlos", "whatsapp": "991234567"}
-          
-        - Entrada: "hospital de passos valor trinta e cinco e cinquenta" (Contexto: route)
-          Saída: {"destinationAddress": "Hospital", "destinationCity": "Passos", "fare": "35.50"}
-          
-        - Entrada: "Rua Sete 210 Centro" (Contexto: route)
-          Saída: {"destinationAddress": "Rua Sete, Centro", "destinationNumber": "210"}`,
+        Sua missão é extrair informações de viagens a partir de áudios que podem ser confusos.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -94,12 +78,14 @@ export const parseRideInfoFromText = async (text: string, context: 'passenger' |
     });
 
     if (response && response.text) {
+      console.log("GEMINI: Resposta bruta:", response.text);
       const result = JSON.parse(response.text.trim());
       return result;
     }
+    console.warn("GEMINI: Resposta vazia ou inválida", response);
     return null;
-  } catch (error) {
-    console.error("Gemini Parsing Error:", error);
+  } catch (error: any) {
+    console.error("Gemini Error Detail:", error?.message || error);
     return null;
   }
 };
