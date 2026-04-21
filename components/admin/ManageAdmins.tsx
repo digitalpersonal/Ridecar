@@ -5,7 +5,6 @@ import { UserIcon } from '../icons';
 
 interface ManageAdminsProps {
   drivers: Driver[];
-  fareRules: FareRule[];
   onSave: (drivers: Driver[]) => void;
   currentDriverId: string;
 }
@@ -21,7 +20,7 @@ const generateUUID = () => {
     });
 };
 
-const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, fareRules, onSave, currentDriverId }) => {
+const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, onSave, currentDriverId }) => {
   // Filter specifically for users with role 'admin'
   const admins = drivers.filter(d => d.role === 'admin');
   
@@ -44,10 +43,7 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, fareRules, onSave,
 
   const handleAddNewClick = () => {
     setEditingId(null);
-    // Tenta definir Guaranésia como padrão, senão pega a primeira da lista, senão vazio
-    const defaultCity = fareRules.find(r => r.destinationCity === 'Guaranésia')?.destinationCity || (fareRules.length > 0 ? fareRules[0].destinationCity : 'Matriz');
-
-    setFormData({ name: '', email: '', password: '', carModel: 'Escritório', licensePlate: 'ADM', city: defaultCity, pixKey: '' });
+    setFormData({ name: '', email: '', password: '', carModel: 'Escritório', licensePlate: 'ADM', city: 'Matriz', pixKey: '' });
     setIsFormVisible(true);
   };
 
@@ -107,9 +103,6 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, fareRules, onSave,
 
   const isFormValid = formData.name.trim() && formData.email.trim() && formData.password?.trim();
   
-  // Ordena cidades para o select
-  const availableCities = [...fareRules].sort((a, b) => a.destinationCity.localeCompare(b.destinationCity));
-
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -194,20 +187,14 @@ const ManageAdmins: React.FC<ManageAdminsProps> = ({ drivers, fareRules, onSave,
                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i className="fa-solid fa-city text-gray-400"></i>
                     </div>
-                    <select
+                    <input
+                        type="text"
                         name="city"
+                        placeholder="Cidade/Unidade"
                         value={formData.city}
                         onChange={handleInputChange}
-                        className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none"
-                    >
-                         <option value="">Selecione a cidade...</option>
-                         <option value="Matriz">Matriz (Padrão)</option>
-                         {availableCities.map((rule) => (
-                             <option key={rule.id} value={rule.destinationCity}>
-                                 {rule.destinationCity}
-                             </option>
-                         ))}
-                    </select>
+                        className="bg-gray-600 p-3 pl-10 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
                 </div>
             </div>
             

@@ -5,7 +5,6 @@ import { UserIcon, CarIcon, PinIcon } from '../icons';
 
 interface ManageDriversProps {
   drivers: Driver[];
-  fareRules: FareRule[];
   onSave: (drivers: Driver[]) => void;
 }
 
@@ -19,7 +18,7 @@ const generateUUID = () => {
     });
 };
 
-const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSave }) => {
+const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, onSave }) => {
   const regularDrivers = drivers.filter(d => d.role !== 'admin');
   
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -60,8 +59,7 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
 
   const handleAddNewClick = () => {
     setEditingDriverId(null);
-    const defaultCity = fareRules.find(r => r.destinationCity === 'Guaranésia')?.destinationCity || (fareRules.length > 0 ? fareRules[0].destinationCity : '');
-    setFormData({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: defaultCity, pixKey: '', photoUrl: '', brandName: '', customLogoUrl: '' });
+    setFormData({ name: '', email: '', password: '', carModel: '', licensePlate: '', city: '', pixKey: '', photoUrl: '', brandName: '', customLogoUrl: '' });
     setIsFormVisible(true);
     setError(null);
   };
@@ -111,7 +109,6 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
   };
 
   const isFormValid = formData.name.trim() && formData.email.trim() && formData.password?.trim();
-  const availableCities = [...fareRules].sort((a, b) => a.destinationCity.localeCompare(b.destinationCity));
 
   return (
     <div>
@@ -167,10 +164,7 @@ const ManageDrivers: React.FC<ManageDriversProps> = ({ drivers, fareRules, onSav
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input type="text" name="carModel" placeholder="Carro" value={formData.carModel} onChange={handleInputChange} className="bg-gray-800 border border-gray-600 p-3 w-full text-white rounded-lg" required />
                 <input type="text" name="licensePlate" placeholder="Placa" value={formData.licensePlate} onChange={handleInputChange} className="bg-gray-800 border border-gray-600 p-3 w-full text-white rounded-lg uppercase" required />
-                <select name="city" value={formData.city} onChange={handleInputChange} className="bg-gray-800 border border-gray-600 p-3 w-full text-white rounded-lg" required>
-                    <option value="">Cidade...</option>
-                    {availableCities.map(r => <option key={r.id} value={r.destinationCity}>{r.destinationCity}</option>)}
-                </select>
+                <input type="text" name="city" placeholder="Cidade Base" value={formData.city} onChange={handleInputChange} className="bg-gray-800 border border-gray-600 p-3 w-full text-white rounded-lg" required />
              </div>
             
             <div className="flex justify-end pt-4">

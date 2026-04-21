@@ -14,27 +14,25 @@ interface AdminPanelProps {
   rideHistory: Ride[];
   passengers: Passenger[];
   drivers: Driver[];
-  fareRules: FareRule[];
   onSaveDrivers: (drivers: Driver[]) => void;
   onSavePassengers: (passengers: Passenger[]) => void;
-  onSaveFareRules: (fareRules: FareRule[]) => void;
   onExitAdminPanel: () => void;
   currentDriver: Driver | null;
   initialTab?: string;
   onUpdateBranding: (updates: Partial<Driver>) => Promise<{ success: boolean; error?: string }>;
 }
 
-type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'admins' | 'fares' | 'financials' | 'branding';
+type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'admins' | 'branding' | 'financials';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-    rideHistory, passengers, drivers, fareRules, onSaveDrivers, 
-    onSavePassengers, onSaveFareRules, onExitAdminPanel, 
+    rideHistory, passengers, drivers, onSaveDrivers, 
+    onSavePassengers, onExitAdminPanel, 
     currentDriver, initialTab = 'dashboard', onUpdateBranding 
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
 
   useEffect(() => {
-    const validTabs: AdminTab[] = ['dashboard', 'history', 'passengers', 'drivers', 'admins', 'fares', 'financials', 'branding'];
+    const validTabs: AdminTab[] = ['dashboard', 'history', 'passengers', 'drivers', 'admins', 'branding', 'financials'];
     if (validTabs.includes(initialTab as AdminTab)) setActiveTab(initialTab as AdminTab);
   }, [initialTab]);
 

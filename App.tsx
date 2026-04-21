@@ -276,7 +276,6 @@ function App() {
             rideHistory={rideHistory} 
             passengers={savedPassengers} 
             drivers={drivers} 
-            fareRules={fareRules} 
             onSaveDrivers={async (l) => { 
                 const oldDriverIds = drivers.map(d => d.id);
                 const newDriverIds = l.map(d => d.id);
@@ -308,27 +307,6 @@ function App() {
                 }
             }} 
             onSavePassengers={setSavedPassengers} 
-            onSaveFareRules={async (f) => {
-                const oldRulesIds = fareRules.map(r => r.id).filter(id => id && !id.includes('fare_'));
-                const newRulesIds = f.map(r => r.id).filter(id => id && !id.includes('fare_'));
-                const deletedIds = oldRulesIds.filter(id => !newRulesIds.includes(id as string));
-
-                setFareRules(f);
-
-                // 1. Upsert
-                await supabase.from('fare_rules').upsert(f.map(rule => ({
-                    id: (rule.id && typeof rule.id === 'string' && rule.id.includes('fare_')) ? undefined : rule.id,
-                    origin_city: rule.originCity,
-                    destination_city: rule.destinationCity,
-                    fare: rule.fare
-                })));
-
-                // 2. Delete
-                if (deletedIds.length > 0) {
-                    console.log("DATABASE: Removendo tarifas:", deletedIds);
-                    await supabase.from('fare_rules').delete().in('id', deletedIds);
-                }
-            }} 
             onExitAdminPanel={() => setAppState(AppState.START)} 
             currentDriver={currentDriver} 
             initialTab={initialDashboardTab} 
