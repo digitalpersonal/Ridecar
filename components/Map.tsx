@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { GeolocationCoordinates } from '../types';
 
-declare const L: any; // Informa ao TypeScript sobre a variável global L do Leaflet
+declare const L: any; 
 
 interface MapProps {
   location: GeolocationCoordinates | null;
@@ -15,57 +15,73 @@ const Map: React.FC<MapProps> = ({ location, isLoading }) => {
   const markerRef = useRef<any>(null);
 
   useEffect(() => {
-    if (mapContainerRef.current && !mapInstanceRef.current) {
-      // Inicializa o mapa
+    if (mapContainerRef.current && !mapInstanceRef.current && typeof L !== 'undefined') {
+      // Coordenadas padrão (São Paulo) para o mapa não começar vazio
+      const defaultCenter: [number, number] = [-23.5505, -46.6333];
+      
       const map = L.map(mapContainerRef.current, {
-          center: [-15.7801, -47.9292], // Centro do Brasil
-          zoom: 4,
+          center: location ? [location.latitude, location.longitude] : defaultCenter, 
+          zoom: location ? 16 : 12,
           zoomControl: false,
           attributionControl: false,
       });
       
-      // Changed to Light tiles (Positron)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CARTO',
         subdomains: 'abcd',
         maxZoom: 20
       }).addTo(map);
 
       mapInstanceRef.current = map;
+
+      // Força o redimensionamento quando o elemento aparece na tela
+      const resizeObserver = new ResizeObserver(() => {
+        map.invalidateSize();
+      });
+      resizeObserver.observe(mapContainerRef.current);
+
+      return () => {
+        resizeObserver.disconnect();
+      };
     }
   }, []);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (map && location) {
+    if (map && location && typeof L !== 'undefined') {
         if (!markerRef.current) {
-            // Darker blue for light map to ensure visibility
-            const blueIcon = L.icon({
-                iconUrl: 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#0369a1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>'),
-                iconSize: [40, 40],
-                iconAnchor: [20, 40],
-                popupAnchor: [0, -40]
+            const blueIcon = L.divIcon({
+                html: `<div class="w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-xl"></div>`,
+                className: '',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
             });
-            markerRef.current = L.marker([location.latitude, location.longitude], { icon: blueIcon }).addTo(map);
-            
-            // Initial View Set
-            map.setView([location.latitude, location.longitude], 18);
-        } else {
-            // Smooth update without full reset
-            markerRef.current.setLatLng([location.latitude, location.longitude]);
+            markerRef.current = L.marker([location.latitude, location.longitude], { icon: blueIcon, zIndexOffset: 1000 }).addTo(map);
             map.panTo([location.latitude, location.longitude]);
+        } else {
+            markerRef.current.setLatLng([location.latitude, location.longitude]);
+            // Só move o mapa automaticamente se ele estiver longe do centro atual
+            const currentCenter = map.getCenter();
+            const dist = L.latLng(location.latitude, location.longitude).distanceTo(currentCenter);
+            if (dist > 100) {
+                map.panTo([location.latitude, location.longitude]);
+            }
         }
     }
   }, [location]);
 
   return (
-    <div className="absolute inset-0 h-full w-full bg-gray-100 overflow-hidden">
-        <div ref={mapContainerRef} className="h-full w-full"></div>
-        {isLoading && (
-            <div className="absolute inset-0 bg-gray-800/70 flex items-center justify-center z-10">
-                <div className="text-center text-white">
-                    <i className="fa-solid fa-spinner fa-spin text-3xl mb-3"></i>
-                    <p>Obtendo localização GPS...</p>
+    <div className="relative h-full w-full bg-gray-950 overflow-hidden">
+        <div ref={mapContainerRef} className="h-full w-full outline-none"></div>
+        
+        {/* Camada de Gradiente Inferior */}
+        <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none"></div>
+
+        {isLoading && !location && (
+            <div className="absolute inset-0 bg-gray-950/40 backdrop-blur-sm flex items-center justify-center z-10">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                    <p className="text-white text-xs font-black uppercase tracking-widest animate-pulse">Iniciando Mapa...</p>
                 </div>
             </div>
         )}

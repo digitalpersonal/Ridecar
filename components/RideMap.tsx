@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { GeolocationCoordinates } from '../types';
 
-declare const L: any; // Informa ao TypeScript sobre a variável global L do Leaflet
+declare const L: any; 
 
 interface RideMapProps {
   startLocation: GeolocationCoordinates | null;
@@ -16,7 +16,6 @@ interface RideMapProps {
   driverName?: string;
 }
 
-// Helpers para ícones SVG em String (Evita uso de ReactDOMServer que causa erro no browser)
 const getPinIconHtml = (iconClass: string, colorClass: string) => `
   <div class="relative flex flex-col items-center" style="transform: translate(0, -50%);">
     <i class="fa-solid ${iconClass} ${colorClass} text-4xl drop-shadow-md" style="font-size: 36px;"></i>
@@ -30,9 +29,8 @@ const getCarIconHtml = (rotation: number) => `
   </svg>
 `;
 
-// Função auxiliar para calcular distância em metros
 const getDistanceFromLatLonInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371e3; // Radius of the earth in km
+  const R = 6371e3; 
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
   const a =
@@ -52,15 +50,12 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
   const startMarkerRef = useRef<any>(null);
   const destinationMarkerRef = useRef<any>(null);
   
-  // Refs para as linhas da rota (Borda branca e linha azul)
   const routePolylineRef = useRef<any>(null);
   const routeBorderRef = useRef<any>(null);
   const straightLineRef = useRef<any>(null);
   
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
   const [isAutoCenter, setIsAutoCenter] = useState(true);
-  
-  // Estado para controlar a última localização onde a rota foi calculada
   const [lastRouteFetchLoc, setLastRouteFetchLoc] = useState<GeolocationCoordinates | null>(null);
 
   const getCarIcon = (rotation: number = 0) => {
@@ -73,285 +68,237 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
   };
   
   useEffect(() => {
-    if (mapContainerRef.current && !mapInstanceRef.current) {
+    if (mapContainerRef.current && !mapInstanceRef.current && typeof L !== 'undefined') {
       const map = L.map(mapContainerRef.current, {
         zoomControl: false,
         attributionControl: false,
         dragging: true,
         touchZoom: true,
+        center: [-23.5505, -46.6333],
+        zoom: 12
       });
       
       map.on('dragstart', () => setIsAutoCenter(false));
       map.on('zoomstart', () => setIsAutoCenter(false));
-      map.on('movestart', (e: any) => {
-         // Opcional: detectar interações mais sutis
-      });
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap',
+        attribution: '&copy; CARTO',
         subdomains: 'abcd',
         maxZoom: 20
       }).addTo(map);
+
       mapInstanceRef.current = map;
+
+      const resizeObserver = new ResizeObserver(() => {
+        map.invalidateSize();
+      });
+      resizeObserver.observe(mapContainerRef.current);
+
+      return () => {
+        resizeObserver.disconnect();
+      };
     }
   }, []);
 
-  // Se o destino mudar, força o reset do cálculo de rota para atualizar imediatamente
-  // Isso previne que a regra dos 30m bloqueie a atualização quando o motorista edita o destino.
   useEffect(() => {
     setLastRouteFetchLoc(null);
   }, [destinationCoords]);
 
-  // Fetch Optimal Route from OSRM
   useEffect(() => {
     const fetchRoute = async () => {
-      // Calculamos a rota a partir da POSIÇÃO ATUAL (se houver) ou do INÍCIO para o destino
       const origin = currentLocation || startLocation;
-      
-      if (!origin || !destinationCoords) return;
+      if (!origin || !destinationCoords || typeof L === 'undefined') return;
 
-      // Validação básica de coordenadas
-      if (isNaN(origin.latitude) || isNaN(origin.longitude) || isNaN(destinationCoords.latitude) || isNaN(destinationCoords.longitude)) {
-          return;
-      }
-
-      // ESTABILIZAÇÃO DA ROTA:
-      // Só recalcula se moveu mais de 30 metros da última vez que calculou
-      if (lastRouteFetchLoc) {
-          const dist = getDistanceFromLatLonInMeters(
+      if (lastRouteFetchLoc && currentLocation) {
+          const distFromLastFetch = getDistanceFromLatLonInMeters(
               origin.latitude, origin.longitude,
               lastRouteFetchLoc.latitude, lastRouteFetchLoc.longitude
           );
-          if (dist < 30) {
-              return; // Não atualiza a rota se moveu pouco
-          }
+          if (distFromLastFetch < 50) return; 
       }
 
-      const fetchFromUrl = async (url: string) => {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
-          const contentType = res.headers.get("content-type");
-          if (!contentType || !contentType.includes("application/json")) {
-              throw new Error("Invalid content type (not JSON)");
-          }
-          return res.json();
-      };
-
       try {
-        let data;
-        
-        // Tentativa 1: Servidor OSRM Alemão (Geralmente mais estável e rápido para demos)
-        try {
-            data = await fetchFromUrl(
-            `https://routing.openstreetmap.de/routed-car/route/v1/driving/${origin.longitude},${origin.latitude};${destinationCoords.longitude},${destinationCoords.latitude}?overview=full&geometries=geojson`
-            );
-        } catch (e) {
-            console.warn("Primary routing server failed, trying backup...");
-            // Tentativa 2: Servidor OSRM Principal (Fallback)
-            data = await fetchFromUrl(
+        const response = await fetch(
             `https://router.project-osrm.org/route/v1/driving/${origin.longitude},${origin.latitude};${destinationCoords.longitude},${destinationCoords.latitude}?overview=full&geometries=geojson`
-            );
-        }
-        
+        );
+        const data = await response.json();
         if (data && data.routes && data.routes.length > 0) {
             const route = data.routes[0];
             const geometry = route.geometry.coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
             setRoutePath(geometry);
-            setLastRouteFetchLoc(origin); // Atualiza a posição de referência para o próximo cálculo
-        } else {
-            // Se não achou rota, desenha linha reta no render (fallback visual)
-            if (routePath.length === 0) setRoutePath([]);
+            setLastRouteFetchLoc(origin);
         }
       } catch (error) {
-        console.warn("Routing unavailable:", error);
-        // Mantém rota anterior ou vazio
+        console.warn("Falha no roteamento OSRM:", error);
       }
     };
-
     fetchRoute();
-  }, [currentLocation, destinationCoords, startLocation]); // Recalcula se mudar posição ou destino
+  }, [currentLocation, destinationCoords, startLocation]);
 
-
-  // Renderização do Mapa
+  // Efecto para marcadores estáticos e infraestrutura da rota
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map || typeof L === 'undefined') return;
     
-    map.invalidateSize();
-  
-    // 1. Marcadores (Início e Fim)
-    if (startMarkerRef.current) map.removeLayer(startMarkerRef.current);
-    if (destinationMarkerRef.current) map.removeLayer(destinationMarkerRef.current);
-  
-    // Marcador de Início
+    // START MARKER
     if (startLocation) {
-      const startIcon = L.divIcon({
-        html: getPinIconHtml('fa-flag', 'text-green-600'),
-        className: '',
-        iconSize: [40, 50],
-        iconAnchor: [20, 50],
-      });
-      startMarkerRef.current = L.marker([startLocation.latitude, startLocation.longitude], { icon: startIcon }).addTo(map);
+      const latLng = [startLocation.latitude, startLocation.longitude] as [number, number];
+      if (!startMarkerRef.current) {
+        const startIcon = L.divIcon({
+          html: getPinIconHtml('fa-flag', 'text-green-600'),
+          className: '', iconSize: [40, 50], iconAnchor: [20, 50],
+        });
+        startMarkerRef.current = L.marker(latLng, { icon: startIcon }).addTo(map);
+      } else {
+        startMarkerRef.current.setLatLng(latLng);
+      }
+    } else if (startMarkerRef.current) {
+      map.removeLayer(startMarkerRef.current);
+      startMarkerRef.current = null;
     }
   
-    // Marcador de Destino
+    // DESTINATION MARKER
     if (destinationCoords) {
-      const destIcon = L.divIcon({
-        html: getPinIconHtml('fa-flag-checkered', 'text-red-600'),
-        className: '',
-        iconSize: [40, 50],
-        iconAnchor: [20, 50],
-      });
-      destinationMarkerRef.current = L.marker([destinationCoords.latitude, destinationCoords.longitude], { icon: destIcon })
-        .addTo(map)
-        .bindTooltip(destination.address, {
-          permanent: true,
-          direction: 'top',
-          offset: [0, -45],
-          className: 'map-label-tooltip'
+      const latLng = [destinationCoords.latitude, destinationCoords.longitude] as [number, number];
+      if (!destinationMarkerRef.current) {
+        const destIcon = L.divIcon({
+          html: getPinIconHtml('fa-flag-checkered', 'text-red-600'),
+          className: '', iconSize: [40, 50], iconAnchor: [20, 50],
         });
+        destinationMarkerRef.current = L.marker(latLng, { icon: destIcon })
+          .addTo(map)
+          .bindTooltip(destination.address, {
+            permanent: true, direction: 'top', offset: [0, -45], className: 'map-label-tooltip'
+          });
+      } else {
+        destinationMarkerRef.current.setLatLng(latLng);
+        if (destinationMarkerRef.current.getTooltip()) {
+          destinationMarkerRef.current.setTooltipContent(destination.address);
+        }
+      }
+    } else if (destinationMarkerRef.current) {
+      map.removeLayer(destinationMarkerRef.current);
+      destinationMarkerRef.current = null;
     }
+  }, [startLocation, destinationCoords, destination.address]);
 
-    // 2. Linhas de Rota (Visual Melhorado)
-    if (routePolylineRef.current) map.removeLayer(routePolylineRef.current);
-    if (routeBorderRef.current) map.removeLayer(routeBorderRef.current);
-    if (straightLineRef.current) map.removeLayer(straightLineRef.current);
-
-    const origin = currentLocation || startLocation;
+  // Efecto para as polilinhas de rota (baseado no routePath)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || typeof L === 'undefined') return;
 
     if (routePath.length > 0) {
-        // CAMADA 1: Borda Branca (Casing) para destacar a rota
-        routeBorderRef.current = L.polyline(routePath, {
-            color: 'white',
-            weight: 10, // Mais grosso que a linha azul
-            opacity: 0.8,
-            lineJoin: 'round',
-            lineCap: 'round'
-        }).addTo(map);
-
-        // CAMADA 2: Rota Azul Principal
-        routePolylineRef.current = L.polyline(routePath, {
-            color: '#3b82f6', // blue-500
-            weight: 6,
-            opacity: 1,
-            lineJoin: 'round',
-            lineCap: 'round'
-        }).addTo(map);
-    } else if (origin && destinationCoords) {
-        // Fallback: Linha reta se não houver rota OSRM
-        straightLineRef.current = L.polyline([
-            [origin.latitude, origin.longitude],
-            [destinationCoords.latitude, destinationCoords.longitude]
-        ], {
-            color: '#6b7280',
-            weight: 4,
-            dashArray: '10, 10',
-            opacity: 0.5
-        }).addTo(map);
-    }
-  
-    // 3. Auto Center (Zoom)
-    if (isAutoCenter) {
-      const bounds = L.latLngBounds([]);
-      let hasPoints = false;
-
-      if (startLocation) {
-          bounds.extend([startLocation.latitude, startLocation.longitude]);
-          hasPoints = true;
-      }
-      if (destinationCoords) {
-          bounds.extend([destinationCoords.latitude, destinationCoords.longitude]);
-          hasPoints = true;
-      }
-      if (currentLocation) {
-          bounds.extend([currentLocation.latitude, currentLocation.longitude]);
-          hasPoints = true;
+      // Limpar linha reta se existir
+      if (straightLineRef.current) {
+        map.removeLayer(straightLineRef.current);
+        straightLineRef.current = null;
       }
 
-      if (routePath.length > 0) {
-          // Adiciona pontos estratégicos da rota para garantir o zoom correto
-          // Início, meio e fim, mais alguns passos
-          const step = Math.max(1, Math.floor(routePath.length / 10));
-          for(let i=0; i<routePath.length; i+=step) {
-              bounds.extend(routePath[i]);
-          }
-          bounds.extend(routePath[routePath.length-1]);
-          hasPoints = true;
+      if (!routePolylineRef.current) {
+        routeBorderRef.current = L.polyline(routePath, { color: 'white', weight: 10, opacity: 0.8 }).addTo(map);
+        routePolylineRef.current = L.polyline(routePath, { color: '#3b82f6', weight: 6, opacity: 1 }).addTo(map);
+      } else {
+        routeBorderRef.current.setLatLngs(routePath);
+        routePolylineRef.current.setLatLngs(routePath);
+      }
+    } else {
+      // Remover polilinhas de rota se não houver path
+      if (routePolylineRef.current) {
+        map.removeLayer(routePolylineRef.current);
+        map.removeLayer(routeBorderRef.current);
+        routePolylineRef.current = null;
+        routeBorderRef.current = null;
       }
 
-      if (hasPoints && bounds.isValid()) {
-          map.fitBounds(bounds, { 
-              padding: [80, 80],
-              maxZoom: 17,
-              animate: true,
-              duration: 1.0
-          });
+      // Desenhar linha reta temporária se necessário
+      const origin = currentLocation || startLocation;
+      if (origin && destinationCoords) {
+        const straightLatLngs = [
+          [origin.latitude, origin.longitude],
+          [destinationCoords.latitude, destinationCoords.longitude]
+        ];
+        if (!straightLineRef.current) {
+          straightLineRef.current = L.polyline(straightLatLngs, { 
+            color: '#6b7280', weight: 4, dashArray: '10, 10', opacity: 0.5 
+          }).addTo(map);
+        } else {
+          straightLineRef.current.setLatLngs(straightLatLngs);
+        }
       }
     }
-  
-  }, [startLocation, destinationCoords, destination.address, routePath, currentLocation, isAutoCenter]);
+  }, [routePath, destinationCoords, startLocation, currentLocation]);
 
-
-  // Efeito do Carro e Rastro
+  // Controle de ajuste de zoom e centralização (AutoCenter)
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !currentLocation) return;
+    if (!map || !isAutoCenter || typeof L === 'undefined') return;
+
+    const bounds = L.latLngBounds([]);
+    let hasPoints = false;
     
-    const latLng = [currentLocation.latitude, currentLocation.longitude];
+    if (startLocation) { bounds.extend([startLocation.latitude, startLocation.longitude]); hasPoints = true; }
+    if (destinationCoords) { bounds.extend([destinationCoords.latitude, destinationCoords.longitude]); hasPoints = true; }
+    if (currentLocation) { bounds.extend([currentLocation.latitude, currentLocation.longitude]); hasPoints = true; }
+    
+    if (hasPoints && bounds.isValid()) {
+      // Usar debounce ou apenas disparar se for a primeira vez ou se a mudança for significativa
+      // Para evitar animações constantes, vamos usar fitBounds com opções que não sejam tão agressivas
+      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 17, animate: true, duration: 1 });
+    }
+  }, [isAutoCenter, startLocation, destinationCoords, routePath]); // Removemos currentLocation daqui para evitar pulos constantes. 
+  // O currentLocation é processado no efeito de movimento do carro separadamente.
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !currentLocation || typeof L === 'undefined') return;
+    
+    const latLng = [currentLocation.latitude, currentLocation.longitude] as [number, number];
 
     if (!carMarkerRef.current) {
       carMarkerRef.current = L.marker(latLng, { icon: getCarIcon(0), zIndexOffset: 1000 }).addTo(map);
-      if (driverName) {
-        carMarkerRef.current.bindTooltip(driverName, {
-            permanent: true, direction: 'bottom', offset: [0, 10], className: 'map-label-tooltip'
-        });
-      }
     } else {
        let rotation = 0;
        if (path.length > 1) {
          const p1 = path[path.length - 2];
          const p2 = path[path.length - 1];
-         const toRad = (deg: number) => deg * Math.PI / 180;
-         const toDeg = (rad: number) => rad * 180 / Math.PI;
-         const lat1 = toRad(p1.latitude);
-         const lat2 = toRad(p2.latitude);
-         const dLon = toRad(p2.longitude - p1.longitude);
-         const y = Math.sin(dLon) * Math.cos(lat2);
-         const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-         const bearing = toDeg(Math.atan2(y, x));
-         rotation = (bearing + 360) % 360;
+         // Pequeno ajuste para evitar rotações absurdas com jitter de GPS
+         const dLon = p2.longitude - p1.longitude;
+         const dLat = p2.latitude - p1.latitude;
+         if (Math.abs(dLon) > 0.00001 || Math.abs(dLat) > 0.00001) {
+           rotation = (Math.atan2(dLon, dLat) * 180 / Math.PI);
+         } else {
+           // Manter a rotação anterior se o movimento for insignificante
+           rotation = carMarkerRef.current.options.rotationAngle || 0;
+         }
        }
-      carMarkerRef.current.setLatLng(latLng).setIcon(getCarIcon(rotation));
+       
+       // Sincronizar posição e ícone
+       carMarkerRef.current.setLatLng(latLng);
+       
+       // Só atualizamos o ícone/rotação se houve mudança perceptível para evitar flickering
+       const currentIconHtml = carMarkerRef.current.options.icon.options.html;
+       const newIconHtml = getCarIconHtml(rotation);
+       if (currentIconHtml !== newIconHtml) {
+          carMarkerRef.current.setIcon(getCarIcon(rotation));
+       }
     }
     
-    // Rastro percorrido (Laranja Escuro)
     const pathLatLngs = path.map(p => [p.latitude, p.longitude]);
     if (!pathPolylineRef.current) {
-      pathPolylineRef.current = L.polyline(pathLatLngs, { color: '#ea580c', weight: 4, opacity: 0.8 }).addTo(map);
+      pathPolylineRef.current = L.polyline(pathLatLngs, { color: '#ea580c', weight: 4, opacity: 0.8, dashArray: '1, 8' }).addTo(map);
     } else {
       pathPolylineRef.current.setLatLngs(pathLatLngs);
     }
-
-  }, [currentLocation, path, driverName]); 
+  }, [currentLocation, path]); 
 
   return (
     <div className="relative h-full w-full bg-gray-100 overflow-hidden">
-      <div ref={mapContainerRef} className="absolute inset-0 h-full w-full"></div>
+      <div ref={mapContainerRef} className="absolute inset-0 h-full w-full outline-none"></div>
       
-       <div className="absolute top-4 left-4 z-[500] p-2 bg-gray-900/80 rounded-lg text-white backdrop-blur-sm shadow-lg border border-gray-700 max-w-[60%]">
-        <p className="text-xs text-gray-400">Destino</p>
-        <p className="text-sm font-semibold truncate">{destination.address}</p>
-      </div>
-
       {!isAutoCenter && (
         <button 
-          onClick={() => {
-              setIsAutoCenter(true);
-              const map = mapInstanceRef.current;
-              if (map) map.invalidateSize();
-          }}
-          className="absolute bottom-6 right-6 z-[500] bg-orange-500 text-white p-3 rounded-full shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center animate-bounce"
-          title="Centralizar Mapa"
+          onClick={() => setIsAutoCenter(true)}
+          className="absolute bottom-6 right-6 z-[500] bg-primary text-white p-4 rounded-full shadow-2xl border-2 border-white/20"
         >
           <i className="fa-solid fa-location-crosshairs text-xl"></i>
         </button>

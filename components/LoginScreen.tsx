@@ -1,99 +1,154 @@
 
 import React, { useState } from 'react';
+import type { Driver } from '../types';
 import { RideCarLogo } from './icons';
 import Footer from './Footer';
 
 interface LoginScreenProps {
     onLogin: (email: string, password: string) => boolean;
-    onNavigateToAdmin: () => void;
+    brandedDriver?: Driver | null;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, brandedDriver }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isFormVisible, setIsFormVisible] = useState(!brandedDriver); // Se não tiver marca, mostra form direto
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         const success = onLogin(email, password);
-        if (!success) {
-            setError('Email ou senha inválidos.');
-        }
+        if (!success) setError('Acesso negado. Verifique os dados.');
     };
+
+    const LegalNotice = () => (
+        <div className="mt-8 p-6 bg-black/60 backdrop-blur-xl border border-primary/30 rounded-[24px] text-left max-w-sm w-full shadow-2xl animate-fadeIn ring-1 ring-white/10">
+            <h4 className="text-primary font-black text-[11px] uppercase tracking-[0.2em] mb-4 flex items-center">
+                <i className="fa-solid fa-scale-balanced mr-3 text-sm"></i>
+                Aviso Legal ao Motorista
+            </h4>
+            <div className="space-y-3">
+                <p className="text-[10px] text-white leading-relaxed font-bold opacity-90">
+                    Este sistema está em conformidade com a <span className="text-primary">Constituição Federal</span> e com a <span className="text-primary font-black underline decoration-2 underline-offset-2">Lei Federal nº 12.587/2012</span> (Política Nacional de Mobilidade Urbana).
+                </p>
+                <p className="text-[10px] text-gray-300 leading-relaxed">
+                    A legislação federal permite que o motorista exerça a atividade como <span className="text-white font-bold">MEI</span> e utilize aplicativo próprio ou sistema próprio para registro das corridas.
+                </p>
+                <p className="text-[10px] text-white/80 leading-relaxed italic border-l-2 border-primary pl-3">
+                    O uso deste sistema garante transparência, segurança e respaldo jurídico durante toda a operação.
+                </p>
+            </div>
+        </div>
+    );
 
     return (
         <div 
-            className="h-full flex flex-col bg-gray-900 overflow-y-auto bg-cover bg-center relative"
+            className="h-full flex flex-col bg-bg-app overflow-y-auto bg-cover bg-center relative"
             style={{ 
-                backgroundImage: "url('https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1080&auto=format&fit=crop')" 
+                backgroundImage: brandedDriver?.photoUrl 
+                    ? `url('${brandedDriver.photoUrl}')` 
+                    : "url('https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1080&auto=format&fit=crop')" 
             }}
         >
-            {/* Camada escura BEM LEVE para permitir ver as pessoas felizes no fundo */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/90 z-0"></div>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/95 z-0"></div>
 
-            {/* Conteúdo principal */}
-            <div className="relative z-10 flex-grow flex flex-col items-center justify-start pt-16 px-6 text-center">
+            <div className="relative z-10 flex-grow flex flex-col items-center justify-center px-6 py-12 text-center">
                 
-                {/* Logo Centralizada e Horizontal */}
-                <div className="mb-8 flex justify-center w-full">
-                     {/* Horizontal: Círculo à esquerda, Texto à direita */}
-                     <RideCarLogo className="h-24 w-auto" horizontal={true} textSize="text-5xl" />
+                {/* Logo e Nome da Marca - Ícone removido conforme solicitado */}
+                <div className="mb-10">
+                     <RideCarLogo 
+                        customName={brandedDriver?.brandName} 
+                        customLogoUrl={brandedDriver?.customLogoUrl}
+                        textSize="text-6xl md:text-7xl"
+                        className="animate-fadeIn"
+                        hideIcon={true}
+                     />
+                     {brandedDriver && (
+                         <div className="mt-4 inline-block px-3 py-1 bg-primary/20 border border-primary/30 rounded-full">
+                            <p className="text-[10px] text-primary font-black uppercase tracking-widest">Portal do Motorista Profissional</p>
+                         </div>
+                     )}
                 </div>
-                
-                <h2 className="text-xl font-medium text-gray-200 mb-8 max-w-xs drop-shadow-lg mx-auto" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                    Ferramenta de gestão para motoristas profissionais.
-                </h2>
 
-                <div className="w-full max-w-sm mx-auto">
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="relative">
-                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                               <i className="fa-solid fa-at text-gray-300"></i>
-                             </div>
-                            <input
-                                type="email"
-                                placeholder="Email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="bg-black/60 p-4 pl-10 w-full text-white placeholder-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 border border-gray-500/50 backdrop-blur-md transition-all font-medium"
-                                required
-                            />
+                {!isFormVisible ? (
+                    <div className="w-full max-w-sm space-y-6 animate-slideUp flex flex-col items-center">
+                        <div className="text-center">
+                            <h2 className="text-white text-xl font-bold">Olá, {brandedDriver?.name}!</h2>
+                            <p className="text-gray-400 text-sm leading-relaxed mt-2">Pronto para iniciar sua jornada de hoje? Acesse sua ferramenta de gestão.</p>
                         </div>
-                        <div className="relative">
-                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                               <i className="fa-solid fa-key text-gray-300"></i>
-                             </div>
-                            <input
-                                type="password"
-                                placeholder="Senha"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="bg-black/60 p-4 pl-10 w-full text-white placeholder-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 border border-gray-500/50 backdrop-blur-md transition-all font-medium"
-                                required
-                            />
-                        </div>
-                        {error && (
-                            <div className="flex items-center space-x-2 text-sm text-red-200 bg-red-900/80 p-3 rounded-lg border border-red-500/50 backdrop-blur-sm">
-                                <i className="fa-solid fa-circle-exclamation"></i>
-                                <span>{error}</span>
-                            </div>
-                        )}
                         
-                        {/* Botão Centralizado */}
-                        <div className="pt-4">
+                        <button 
+                            onClick={() => setIsFormVisible(true)}
+                            className="w-full bg-primary hover:bg-primary-hover text-white font-black py-5 rounded-2xl shadow-2xl transform active:scale-95 transition-all text-lg uppercase"
+                        >
+                            Entrar no Sistema
+                        </button>
+
+                        <LegalNotice />
+                    </div>
+                ) : (
+                    <div className="w-full max-w-sm mx-auto animate-fadeIn flex flex-col items-center">
+                        <form onSubmit={handleSubmit} className="w-full space-y-4">
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fa-solid fa-envelope text-gray-500"></i>
+                                </div>
+                                <input
+                                    type="email"
+                                    placeholder="Seu E-mail"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="bg-gray-900/80 p-4 pl-12 w-full text-white placeholder-gray-500 rounded-2xl focus:ring-2 focus:ring-primary border border-gray-800 backdrop-blur-md transition-all font-bold"
+                                    required
+                                />
+                            </div>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i className="fa-solid fa-lock text-gray-500"></i>
+                                </div>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Sua Senha"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="bg-gray-900/80 p-4 pl-12 pr-12 w-full text-white placeholder-gray-500 rounded-2xl focus:ring-2 focus:ring-primary border border-gray-800 backdrop-blur-md transition-all font-bold"
+                                    required
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500"
+                                >
+                                    <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                                </button>
+                            </div>
+                            
+                            {error && <p className="text-red-400 text-xs font-bold bg-red-950/30 p-2 rounded-lg">{error}</p>}
+                            
                             <button
                                 type="submit"
-                                className="mx-auto block w-full bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold py-4 px-12 rounded-full transition-all hover:from-orange-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-orange-500 shadow-lg shadow-orange-500/30 transform hover:-translate-y-0.5 border border-orange-400/20 text-lg"
+                                className="w-full bg-primary hover:bg-primary-hover text-white font-black py-5 rounded-2xl shadow-xl transform active:scale-95 transition-all uppercase tracking-tight"
                             >
-                                Entrar no Sistema
+                                Acessar Agora
                             </button>
-                        </div>
-                    </form>
-                </div>
+                        </form>
+
+                        <LegalNotice />
+
+                        {brandedDriver && (
+                            <button 
+                                onClick={() => setIsFormVisible(false)}
+                                className="mt-8 text-xs text-gray-500 hover:text-white underline font-bold uppercase tracking-widest transition-colors"
+                            >
+                                Voltar para a Home
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
             
-            {/* Rodapé */}
             <div className="relative z-10 w-full mt-auto">
                 <Footer />
             </div>

@@ -3,6 +3,7 @@ import type { GeolocationCoordinates } from '../types';
 
 interface GeolocationState {
   location: GeolocationCoordinates | null;
+  accuracy: number | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -10,6 +11,7 @@ interface GeolocationState {
 export function useGeolocation(): GeolocationState {
   const [state, setState] = useState<GeolocationState>({
     location: null,
+    accuracy: null,
     isLoading: true,
     error: null,
   });
@@ -18,6 +20,7 @@ export function useGeolocation(): GeolocationState {
     if (!navigator.geolocation) {
       setState({
         location: null,
+        accuracy: null,
         isLoading: false,
         error: 'Geolocalização não é suportada pelo seu navegador.',
       });
@@ -30,6 +33,7 @@ export function useGeolocation(): GeolocationState {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         },
+        accuracy: position.coords.accuracy,
         isLoading: false,
         error: null,
       });
@@ -50,12 +54,22 @@ export function useGeolocation(): GeolocationState {
       }
       setState({
         location: null,
+        accuracy: null,
         isLoading: false,
         error: errorMessage,
       });
     };
 
     setState(prev => ({ ...prev, isLoading: true }));
+
+    // Tenta obter a primeira posição (mesmo que com menor precisão)
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+    });
+
+    // Mantém atualizando, focando na mais alta precisão possível
     const watchId = navigator.geolocation.watchPosition(onSuccess, onError, {
       enableHighAccuracy: true,
       timeout: 10000,

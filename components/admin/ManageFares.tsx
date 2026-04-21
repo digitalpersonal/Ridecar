@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { FareRule } from '../../types';
 
@@ -9,7 +10,7 @@ interface ManageFaresProps {
 const ManageFares: React.FC<ManageFaresProps> = ({ fareRules, onSave }) => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editingFareId, setEditingFareId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ destinationCity: '', fare: ''});
+  const [formData, setFormData] = useState({ originCity: '', destinationCity: '', fare: ''});
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -19,20 +20,22 @@ const ManageFares: React.FC<ManageFaresProps> = ({ fareRules, onSave }) => {
   const handleCancel = () => {
     setIsFormVisible(false);
     setEditingFareId(null);
-    setFormData({ destinationCity: '', fare: '' });
+    setFormData({ originCity: '', destinationCity: '', fare: '' });
   };
 
   const handleAddNewClick = () => {
+    // Fixed typo: setEditingId -> setEditingFareId
     setEditingFareId(null);
-    setFormData({ destinationCity: '', fare: '' });
+    setFormData({ originCity: '', destinationCity: '', fare: '' });
     setIsFormVisible(true);
   };
 
   const handleEditClick = (rule: FareRule) => {
     setEditingFareId(rule.id);
     setFormData({
+      originCity: rule.originCity || '',
       destinationCity: rule.destinationCity,
-      fare: String(rule.fare), // Form input needs a string
+      fare: String(rule.fare),
     });
     setIsFormVisible(true);
   };
@@ -40,26 +43,25 @@ const ManageFares: React.FC<ManageFaresProps> = ({ fareRules, onSave }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const fareValue = parseFloat(formData.fare);
-    if (formData.destinationCity && !isNaN(fareValue) && fareValue > 0) {
+    if (formData.originCity && formData.destinationCity && !isNaN(fareValue) && fareValue > 0) {
       let updatedFareRules;
       if (editingFareId) {
-        // Editing existing fare
         updatedFareRules = fareRules.map(rule => 
           rule.id === editingFareId 
-            ? { ...rule, destinationCity: formData.destinationCity, fare: fareValue } 
+            ? { ...rule, originCity: formData.originCity, destinationCity: formData.destinationCity, fare: fareValue } 
             : rule
         );
       } else {
-        // Adding new fare
         const newFareRule: FareRule = {
           id: `fare_${Date.now()}`,
+          originCity: formData.originCity,
           destinationCity: formData.destinationCity,
           fare: fareValue,
         };
         updatedFareRules = [...fareRules, newFareRule];
       }
       onSave(updatedFareRules);
-      handleCancel(); // Reset and close form
+      handleCancel();
     }
   };
   
@@ -71,90 +73,138 @@ const ManageFares: React.FC<ManageFaresProps> = ({ fareRules, onSave }) => {
     }
   };
 
-  const isFormValid = formData.destinationCity.trim() && formData.fare.trim();
+  const isFormValid = formData.originCity.trim() && formData.destinationCity.trim() && formData.fare.trim();
+
+  // Agrupa tarifas por origem para melhor visualização
+  const groupedFares = fareRules.reduce((acc, rule) => {
+    const origin = rule.originCity || 'Sem Origem';
+    if (!acc[origin]) acc[origin] = [];
+    acc[origin].push(rule);
+    return acc;
+  }, {} as Record<string, FareRule[]>);
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-2xl font-semibold text-white">Tarifas Cadastradas</h3>
+    <div className="animate-fadeIn">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div>
+            <h3 className="text-2xl font-black text-white italic uppercase tracking-tight">Tabelas de Tarifas</h3>
+            <p className="text-gray-400 text-sm">Gerencie preços específicos por cidade de origem.</p>
+        </div>
         <button
           onClick={isFormVisible ? handleCancel : handleAddNewClick}
-          className="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors hover:bg-orange-600 text-sm"
+          className="bg-primary text-white font-black py-3 px-6 rounded-xl transition-all hover:bg-primary-hover shadow-lg shadow-primary/20 flex items-center uppercase text-xs tracking-widest"
         >
-          {isFormVisible ? 'Cancelar' : 'Adicionar Tarifa'}
+          <i className={`fa-solid ${isFormVisible ? 'fa-times' : 'fa-plus'} mr-2 text-sm`}></i>
+          {isFormVisible ? 'Cancelar' : 'Nova Tarifa'}
         </button>
       </div>
       
       {isFormVisible && (
-        <div className="bg-gray-700 p-4 rounded-lg mb-6">
-           <h4 className="text-lg font-semibold text-white mb-4 text-center">
-            {editingFareId ? 'Editar Tarifa' : 'Adicionar Nova Tarifa'}
+        <div className="bg-gray-700/50 backdrop-blur-md border border-primary/30 p-6 rounded-2xl mb-8 shadow-2xl animate-slideDown">
+          <h4 className="text-sm font-black text-primary uppercase tracking-[0.2em] mb-6 text-center">
+            {editingFareId ? 'Editar Regra de Preço' : 'Cadastrar Novo Preço'}
           </h4>
           <form onSubmit={handleSubmit} className="space-y-4">
-             <div className="relative">
-                <input
-                  type="text"
-                  name="destinationCity"
-                  placeholder="Cidade de Destino"
-                  value={formData.destinationCity}
-                  onChange={handleInputChange}
-                  className="bg-gray-600 p-3 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                    <label className="text-[10px] text-gray-400 font-black uppercase ml-1">Cidade de Origem</label>
+                    <input
+                        type="text"
+                        name="originCity"
+                        placeholder="Ex: Guaxupé"
+                        value={formData.originCity}
+                        onChange={handleInputChange}
+                        className="bg-gray-800 border border-gray-600 p-4 w-full text-white placeholder-gray-500 rounded-xl focus:ring-2 focus:ring-primary outline-none font-bold"
+                        required
+                    />
+                </div>
+                <div className="space-y-1">
+                    <label className="text-[10px] text-gray-400 font-black uppercase ml-1">Cidade de Destino</label>
+                    <input
+                        type="text"
+                        name="destinationCity"
+                        placeholder="Ex: Guaranésia"
+                        value={formData.destinationCity}
+                        onChange={handleInputChange}
+                        className="bg-gray-800 border border-gray-600 p-4 w-full text-white placeholder-gray-500 rounded-xl focus:ring-2 focus:ring-primary outline-none font-bold"
+                        required
+                    />
+                </div>
             </div>
-            <div className="relative">
-                <input
-                  type="number"
-                  name="fare"
-                  placeholder="Valor (R$)"
-                  step="0.01"
-                  min="0"
-                  value={formData.fare}
-                  onChange={handleInputChange}
-                  className="bg-gray-600 p-3 w-full text-white placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
+            <div className="space-y-1">
+                <label className="text-[10px] text-gray-400 font-black uppercase ml-1">Valor da Corrida (R$)</label>
+                <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-primary font-black">R$</span>
+                    <input
+                        type="number"
+                        name="fare"
+                        placeholder="0,00"
+                        step="0.01"
+                        min="0"
+                        value={formData.fare}
+                        onChange={handleInputChange}
+                        className="bg-gray-800 border border-gray-600 p-4 pl-12 w-full text-white placeholder-gray-500 rounded-xl focus:ring-2 focus:ring-primary outline-none text-xl font-black"
+                        required
+                    />
+                </div>
             </div>
             <button
               type="submit"
               disabled={!isFormValid}
-              className="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors hover:bg-green-600"
+              className="w-full bg-green-600 text-white font-black py-4 px-4 rounded-xl disabled:bg-gray-800 disabled:text-gray-600 transition-all hover:bg-green-700 shadow-xl active:scale-95 uppercase tracking-widest text-xs"
             >
-              {editingFareId ? 'Salvar Alterações' : 'Salvar Tarifa'}
+              {editingFareId ? 'Atualizar Tarifa' : 'Salvar na Tabela'}
             </button>
           </form>
         </div>
       )}
 
       {fareRules.length === 0 ? (
-        <p className="text-gray-400 text-center mt-8">Nenhuma tarifa cadastrada ainda.</p>
+        <div className="text-center py-20 bg-gray-800/30 rounded-3xl border-2 border-dashed border-gray-700">
+            <i className="fa-solid fa-tags text-5xl text-gray-700 mb-4"></i>
+            <p className="text-gray-500 font-bold italic">Nenhuma tarifa cadastrada ainda.</p>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {fareRules.map((rule) => (
-            <div key={rule.id} className="bg-gray-700 p-4 rounded-lg flex justify-between items-center flex-wrap gap-2">
-              <div>
-                <p className="font-semibold text-white">{rule.destinationCity}</p>
-                <p className="text-xs text-gray-400">Tarifa fixa</p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <p className="text-lg font-bold text-orange-400 mr-4">R${rule.fare.toFixed(2)}</p>
-                 <button 
-                  onClick={() => handleEditClick(rule)}
-                  className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-semibold flex items-center px-3 py-1 bg-gray-600/50 hover:bg-gray-600 rounded-md"
-                  aria-label={`Editar tarifa para ${rule.destinationCity}`}
-                >
-                  <i className="fa-solid fa-pencil mr-2"></i>
-                  Editar
-                </button>
-                <button 
-                  onClick={() => handleDelete(rule.id)}
-                  className="text-red-400 hover:text-red-300 transition-colors text-sm font-semibold flex items-center px-3 py-1 bg-gray-600/50 hover:bg-gray-600 rounded-md"
-                  aria-label={`Remover tarifa para ${rule.destinationCity}`}
-                >
-                  <i className="fa-solid fa-trash-can mr-2"></i>
-                  Excluir
-                </button>
-              </div>
+        <div className="space-y-10">
+          {/* Fixed: Added explicit type cast to Object.entries to resolve 'unknown' type inference for 'rules' */}
+          {(Object.entries(groupedFares) as [string, FareRule[]][]).map(([origin, rules]) => (
+            <div key={origin} className="space-y-4">
+                <div className="flex items-center space-x-3 border-b border-gray-700 pb-2">
+                    <div className="bg-primary/20 p-2 rounded-lg">
+                        <i className="fa-solid fa-location-dot text-primary"></i>
+                    </div>
+                    <h4 className="text-white font-black uppercase tracking-widest text-sm">Partindo de: <span className="text-primary italic">{origin}</span></h4>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {rules.map((rule) => (
+                        <div key={rule.id} className="bg-gray-800/80 border border-gray-700 p-4 rounded-2xl flex justify-between items-center hover:border-primary/50 transition-all group shadow-lg">
+                            <div>
+                                <p className="text-[10px] text-gray-500 font-black uppercase tracking-tighter">Destino</p>
+                                <p className="font-black text-white italic text-lg">{rule.destinationCity}</p>
+                            </div>
+                            <div className="flex items-center">
+                                <p className="text-xl font-black text-primary italic mr-4">R$ {rule.fare.toFixed(2)}</p>
+                                <div className="flex space-x-2">
+                                    <button 
+                                        onClick={() => handleEditClick(rule)}
+                                        className="w-8 h-8 flex items-center justify-center bg-gray-700 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                                        title="Editar"
+                                    >
+                                        <i className="fa-solid fa-pencil text-xs"></i>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDelete(rule.id)}
+                                        className="w-8 h-8 flex items-center justify-center bg-gray-700 hover:bg-red-600 text-white rounded-lg transition-colors"
+                                        title="Excluir"
+                                    >
+                                        <i className="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
           ))}
         </div>

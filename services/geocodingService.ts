@@ -1,6 +1,9 @@
 
 import type { AddressSuggestion, GeolocationCoordinates } from '../types';
 
+// Cache simples para evitar requisições repetidas
+const cache: { [key: string]: any } = {};
+
 /**
  * Busca sugestões de endereço usando a API Nominatim (OpenStreetMap).
  * Retorna apenas o NOME DA RUA ou LOCAL para facilitar o preenchimento do número pelo motorista.
@@ -8,37 +11,42 @@ import type { AddressSuggestion, GeolocationCoordinates } from '../types';
 export const geocodeAddress = async (query: string, city: string): Promise<AddressSuggestion[]> => {
   if (!query || query.length < 3) return [];
 
+  const cacheKey = `geocode_${query}_${city}`;
+  if (cache[cacheKey]) return cache[cacheKey];
+
   try {
-    // Adiciona o contexto da cidade e país para melhorar a precisão
-    const fullQuery = `${query}, ${city}, Brazil`;
-    
-    // Removendo headers customizados para evitar problemas de CORS
+    // Photon (Komoot) é mais rápido e tem CORS menos restritivo para busca
+    const fullQuery = `${query}, ${city}`;
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&addressdetails=1&limit=5&countrycodes=br`
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(fullQuery)}&limit=5&lang=pt`
     );
     
     if (!response.ok) return [];
 
     const data = await response.json();
     
-    // Mapeia os resultados para mostrar SOMENTE o nome da rua/local
-    return data.map((item: any) => {
-        const addr = item.address || {};
+    if (!data || !data.features) return [];
+    
+    const results = data.features.map((feature: any) => {
+        const props = feature.properties;
+        let streetName = props.name || props.street;
         
-        // Prioridade: Nome da Rua > Pedestre > Rodovia > Praça > Nome do Lugar
-        let streetName = addr.road || addr.pedestrian || addr.highway || addr.square || item.name;
-
-        // Fallback: Se não achou campo específico, pega a primeira parte do display_name
-        if (!streetName) {
-             streetName = item.display_name.split(',')[0];
+        if (props.street && props.name !== props.street) {
+             streetName = `${props.name} (${props.street})`;
         }
 
-        return {
-            description: streetName
-        };
+        if (!streetName) streetName = props.district || props.city;
+
+        return { description: streetName || "Local desconhecido" };
     });
+
+    // Remove duplicatas
+    const uniqueResults = results.filter((v: any, i: any, a: any) => a.findIndex((t: any) => t.description === v.description) === i);
+
+    cache[cacheKey] = uniqueResults;
+    return uniqueResults;
   } catch (error) {
-    console.error("Geocoding error:", error);
+    // Silencia o erro de fetch para não poluir o console do usuário
     return [];
   }
 };
@@ -50,28 +58,38 @@ export const getCoordinatesForAddress = async (
   address: string,
   city: string
 ): Promise<GeolocationCoordinates | null> => {
+  const cacheKey = `coords_${address}_${city}`;
+  if (cache[cacheKey]) return cache[cacheKey];
+
   try {
     const fullQuery = `${address}, ${city}, Brazil`;
-    
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&limit=1&countrycodes=br`
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&limit=1&countrycodes=br`,
+      {
+          headers: {
+              'Accept': 'application/json',
+          }
+      }
     );
 
     if (!response.ok) return null;
 
     const data = await response.json();
     if (data && data.length > 0) {
-      return {
+      const res = {
         latitude: parseFloat(data[0].lat),
         longitude: parseFloat(data[0].lon),
       };
+      cache[cacheKey] = res;
+      return res;
     }
     return null;
   } catch (error) {
-    console.error("Coordinate fetch error:", error);
     return null;
   }
 };
+
+let lastReverseCoords = { lat: 0, lon: 0, time: 0 };
 
 /**
  * Obtém o endereço legível e a cidade a partir de coordenadas GPS (Reverse Geocoding).
@@ -80,31 +98,63 @@ export const getAddressFromCoordinates = async (
   latitude: number, 
   longitude: number
 ): Promise<{ address: string; city: string } | null> => {
-  try {
+  const now = Date.now();
+  // Calcula a distância quadrada. 0.00000001 (10^-8) é aprox 10 metros, o que exige alta precisão.
+  const distSq = Math.pow(latitude - lastReverseCoords.lat, 2) + Math.pow(longitude - lastReverseCoords.lon, 2);
+  
+  // Apenas usa cache se foi há menos de 10 segundos E a distância for menor que ~10 metros
+  if (now - lastReverseCoords.time < 10000 && distSq < 0.00000001) {
+      const cached = cache[`reverse_${latitude.toFixed(5)}_${longitude.toFixed(5)}`];
+      if (cached) return cached;
+  }
+
+    try {
+    // Adicionamos parâmetros recomendados pela Nominatim para identificar o app e evitar bloqueios.
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&extratags=1&email=digitalpersonal@gmail.com`,
+      {
+          headers: {
+              'Accept': 'application/json',
+              'Accept-Language': 'pt-BR,pt;q=0.9',
+          }
+      }
     );
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+        // Fallback para uma API secundária se o Nominatim falhar (ex: BigDataCloud)
+        const bdcResponse = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=pt`);
+        if (bdcResponse.ok) {
+            const bdcData = await bdcResponse.json();
+            const res = { 
+                address: bdcData.locality || bdcData.city || "Localização Capturada", 
+                city: bdcData.city || bdcData.principalSubdivision || '' 
+            };
+            return res;
+        }
+        return null;
+    }
 
     const data = await response.json();
     if (data && data.address) {
         const addr = data.address;
         
-        // Prioriza mostrar apenas a rua onde o motorista está
-        const street = addr.road || addr.pedestrian || addr.highway || addr.square || addr.suburb || data.display_name.split(',')[0];
+        const road = addr.road || addr.pedestrian || addr.highway || addr.square || addr.stairway;
+        const houseNumber = addr.house_number ? ` ${addr.house_number}` : '';
+        const neighborhood = addr.neighbourhood || addr.suburb || addr.city_district || addr.hamlet;
         
-        // Tenta encontrar a cidade em vários campos possíveis do Nominatim
-        const city = addr.city || addr.town || addr.village || addr.municipality || addr.administrative || '';
+        let street = road ? `${road}${houseNumber}` : (addr.suburb || neighborhood || "Endereço não identificado");
+        if (neighborhood && road && neighborhood !== road) street += ` - ${neighborhood}`;
+        
+        const city = addr.city || addr.town || addr.village || addr.municipality || addr.city_district || '';
 
-        return {
-            address: street,
-            city: city
-        };
+        const res = { address: street, city: city };
+        cache[`reverse_${latitude.toFixed(5)}_${longitude.toFixed(5)}`] = res;
+        lastReverseCoords = { lat: latitude, lon: longitude, time: now };
+        return res;
     }
     return null;
   } catch (error) {
-    console.error("Reverse geocoding error:", error);
+    // Se falhar o fetch, retornamos null silenciosamente
     return null;
   }
 };

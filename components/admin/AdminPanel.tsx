@@ -8,6 +8,7 @@ import ManageDrivers from './ManageDrivers';
 import ManageAdmins from './ManageAdmins';
 import ManageFares from './ManageFares';
 import Financials from './Financials';
+import ManageBranding from './ManageBranding';
 
 interface AdminPanelProps {
   rideHistory: Ride[];
@@ -20,49 +21,36 @@ interface AdminPanelProps {
   onExitAdminPanel: () => void;
   currentDriver: Driver | null;
   initialTab?: string;
+  onUpdateBranding: (updates: Partial<Driver>) => Promise<{ success: boolean; error?: string }>;
 }
 
-type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'admins' | 'fares' | 'financials';
+type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'admins' | 'fares' | 'financials' | 'branding';
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, drivers, fareRules, onSaveDrivers, onSavePassengers, onSaveFareRules, onExitAdminPanel, currentDriver, initialTab = 'dashboard' }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ 
+    rideHistory, passengers, drivers, fareRules, onSaveDrivers, 
+    onSavePassengers, onSaveFareRules, onExitAdminPanel, 
+    currentDriver, initialTab = 'dashboard', onUpdateBranding 
+}) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
 
   useEffect(() => {
-    // Validate if the passed string is a valid tab
-    const validTabs: AdminTab[] = ['dashboard', 'history', 'passengers', 'drivers', 'admins', 'fares', 'financials'];
-    if (validTabs.includes(initialTab as AdminTab)) {
-        setActiveTab(initialTab as AdminTab);
-    }
+    const validTabs: AdminTab[] = ['dashboard', 'history', 'passengers', 'drivers', 'admins', 'fares', 'financials', 'branding'];
+    if (validTabs.includes(initialTab as AdminTab)) setActiveTab(initialTab as AdminTab);
   }, [initialTab]);
 
   const isAdmin = currentDriver?.role === 'admin';
 
-  // Se um usuário não-admin tentar acessar uma aba restrita, redireciona para dashboard
-  useEffect(() => {
-    if (!isAdmin && ['drivers', 'admins', 'fares'].includes(activeTab)) {
-        setActiveTab('dashboard');
-    }
-  }, [isAdmin, activeTab]);
-
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard rideHistory={rideHistory} currentDriver={currentDriver} />;
-      case 'history':
-        return <RideHistory rideHistory={rideHistory} currentDriver={currentDriver} />;
-      case 'passengers':
-        // Passageiros são compartilhados (base de clientes da empresa), então todos veem
-        return <ManagePassengers passengers={passengers} onSave={onSavePassengers} />;
-      case 'drivers':
-        return isAdmin ? <ManageDrivers drivers={drivers} fareRules={fareRules} onSave={onSaveDrivers} /> : null;
-      case 'admins':
-        return isAdmin ? <ManageAdmins drivers={drivers} fareRules={fareRules} onSave={onSaveDrivers} currentDriverId={currentDriver?.id || ''} /> : null;
-      case 'fares':
-        return isAdmin ? <ManageFares fareRules={fareRules} onSave={onSaveFareRules} /> : null;
-      case 'financials':
-        return <Financials rideHistory={rideHistory} drivers={drivers} currentDriver={currentDriver} />;
-      default:
-        return null;
+      case 'dashboard': return <Dashboard rideHistory={rideHistory} currentDriver={currentDriver} />;
+      case 'history': return <RideHistory rideHistory={rideHistory} currentDriver={currentDriver} drivers={drivers} />;
+      case 'passengers': return <ManagePassengers passengers={passengers} onSave={onSavePassengers} />;
+      case 'branding': return currentDriver ? <ManageBranding currentDriver={currentDriver} onUpdate={onUpdateBranding} /> : null;
+      case 'drivers': return isAdmin ? <ManageDrivers drivers={drivers} fareRules={fareRules} onSave={onSaveDrivers} /> : null;
+      case 'admins': return isAdmin ? <ManageAdmins drivers={drivers} fareRules={fareRules} onSave={onSaveDrivers} currentDriverId={currentDriver?.id || ''} /> : null;
+      case 'fares': return isAdmin ? <ManageFares fareRules={fareRules} onSave={onSaveFareRules} /> : null;
+      case 'financials': return <Financials rideHistory={rideHistory} drivers={drivers} currentDriver={currentDriver} />;
+      default: return null;
     }
   };
 
@@ -71,9 +59,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
       onClick={() => setActiveTab(tab)}
       className={`px-4 py-2 text-sm font-medium rounded-md transition-all flex-shrink-0 flex items-center whitespace-nowrap ${
         activeTab === tab 
-          ? 'bg-orange-500 text-white shadow-lg' 
+          ? 'bg-primary text-white shadow-lg' 
           : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-      } ${restricted ? 'border border-orange-500/30' : ''}`}
+      }`}
     >
       {restricted && <i className="fa-solid fa-lock text-[10px] mr-2 text-orange-400"></i>}
       {icon && <i className={`fa-solid ${icon} mr-2`}></i>}
@@ -83,27 +71,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
 
   return (
     <div className="bg-gray-800 h-full flex flex-col">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 shadow-md z-10">
+      {/* Cabeçalho do Painel */}
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 shadow-md z-[1001]">
         <div className="flex items-center">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${isAdmin ? 'bg-orange-600' : 'bg-blue-600'}`}>
-                <i className={`fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-id-card'} text-white`}></i>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 bg-primary/20 border border-primary/40`}>
+                <i className={`fa-solid ${isAdmin ? 'fa-user-shield' : 'fa-star'} text-primary`}></i>
             </div>
             <div>
-                <h2 className="text-lg font-bold text-white leading-tight">
-                    {isAdmin ? 'Painel Administrativo' : 'Painel do Motorista'}
+                <h2 className="text-lg font-black text-white italic leading-tight uppercase tracking-tight">
+                    {isAdmin ? 'Painel Administrativo' : (currentDriver?.brandName || 'Meu App Profissional')}
                 </h2>
-                <p className="text-xs text-gray-400">
-                    Olá, <span className="text-orange-400">{currentDriver?.name}</span>
-                </p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Acessado por: <span className="text-gray-300">{currentDriver?.name}</span></p>
             </div>
         </div>
-        <button
-          onClick={onExitAdminPanel}
-          className="bg-gray-700 text-gray-300 hover:text-white border border-gray-600 hover:bg-gray-600 font-semibold py-2 px-4 rounded-lg text-sm transition-colors flex items-center"
-          title="Voltar para a tela inicial"
-        >
-          <i className="fa-solid fa-arrow-left mr-2"></i>
-          Voltar
+        <button onClick={onExitAdminPanel} className="bg-gray-800 text-gray-400 hover:text-white border border-gray-700 font-black py-2 px-6 rounded-xl text-[10px] transition-all uppercase tracking-widest flex items-center active:scale-95 shadow-lg">
+          <i className="fa-solid fa-arrow-left mr-2"></i> Voltar
         </button>
       </div>
       
@@ -112,9 +94,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ rideHistory, passengers, driver
           <TabButton tab="dashboard" label="Resumo" icon="fa-chart-pie" />
           <TabButton tab="financials" label="Financeiro" icon="fa-wallet" />
           <TabButton tab="history" label="Minhas Corridas" icon="fa-clock-rotate-left" />
-          <TabButton tab="passengers" label="Passageiros" icon="fa-users" />
+          <TabButton tab="passengers" label="Meus Clientes" icon="fa-users" />
+          <TabButton tab="branding" label="Personalizar App" icon="fa-palette" />
           
-          {/* Tabs visible only to Admins */}
           {isAdmin && (
             <>
               <div className="w-px bg-gray-600 mx-2 h-8 self-center"></div>

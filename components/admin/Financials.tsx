@@ -26,10 +26,8 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
     const [selectedDriverId, setSelectedDriverId] = useState<string>('');
 
     const isAdmin = useMemo(() => {
-        // Admin is the first driver in the list.
-        if (!currentDriver || drivers.length === 0) return false;
-        return currentDriver.id === drivers[0].id;
-    }, [currentDriver, drivers]);
+        return currentDriver?.role === 'admin';
+    }, [currentDriver]);
 
     useEffect(() => {
         if (!isAdmin && currentDriver) {
@@ -54,11 +52,13 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
         }
 
         const totalRevenue = driverRides.reduce((sum, ride) => sum + ride.fare, 0);
+        const totalDistance = driverRides.reduce((sum, ride) => sum + ride.distance, 0);
         const totalRides = driverRides.length;
         const averageTicket = totalRides > 0 ? totalRevenue / totalRides : 0;
 
         return {
             totalRevenue,
+            totalDistance,
             totalRides,
             averageTicket,
             rides: [...driverRides].reverse() // Show most recent first
@@ -116,7 +116,7 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
             ) : (
                 <>
                     {/* Stats Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                         <StatCard 
                             title="Faturamento Total" 
                             value={`R$${driverFinancials.totalRevenue.toFixed(2)}`}
@@ -131,6 +131,11 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
                             title="Ticket Médio" 
                             value={`R$${driverFinancials.averageTicket.toFixed(2)}`}
                             icon="fa-receipt"
+                        />
+                         <StatCard 
+                            title="Km Rodados" 
+                            value={`${driverFinancials.totalDistance.toFixed(1)} km`}
+                            icon="fa-route"
                         />
                     </div>
 
