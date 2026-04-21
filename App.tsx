@@ -285,9 +285,9 @@ function App() {
                     const mappedData = l.map(d => ({ 
                         id: d.id, name: d.name, email: d.email, password: d.password, 
                         car_model: d.carModel, license_plate: d.licensePlate, city: d.city, 
-                        role: d.role, pix_key: d.pixKey, photo_url: d.photoUrl, 
+                        role: d.role, pix_key: d.pixKey, photo_url: d.photoUrl,
                         brand_name: d.brandName, primary_color: d.primaryColor, background_color: d.backgroundColor,
-                        custom_logo_url: d.customLogoUrl, slug: d.slug 
+                        custom_logo_url: d.customLogoUrl, slug: d.slug
                     }));
 
                     const { error: upsertError } = await supabase.from('drivers').upsert(mappedData);
@@ -331,11 +331,13 @@ function App() {
                 try {
                     const upd = { ...currentDriver, ...u }; 
                     const { error } = await supabase.from('drivers').update({ 
-                        brand_name: u.brandName, 
-                        primary_color: u.primaryColor, 
+                        brand_name: u.brandName,
+                        primary_color: u.primaryColor,
                         background_color: u.backgroundColor,
-                        custom_logo_url: u.customLogoUrl, 
-                        slug: u.slug 
+                        custom_logo_url: u.customLogoUrl,
+                        slug: u.slug,
+                        photo_url: u.photoUrl,
+                        pix_key: u.pixKey
                     }).eq('id', currentDriver.id); 
 
                     if (error) {
