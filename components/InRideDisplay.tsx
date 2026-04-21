@@ -120,7 +120,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
       {/* HEADER DINÂMICO */}
       <div className="absolute top-0 left-0 w-full z-[2000] p-4 bg-gradient-to-b from-black/90 to-transparent flex justify-between items-center pointer-events-none">
           <div className="pointer-events-auto bg-gray-900/80 backdrop-blur-xl rounded-full px-5 py-2.5 border border-primary/30 shadow-2xl flex items-center">
-              <RideCarLogo className="h-9 w-auto" horizontal={true} hideIcon={true} customName={driver.brandName} customLogoUrl={driver.customLogoUrl} />
+              <RideCarLogo className="h-9 w-auto" horizontal={true} customName={driver.brandName} customLogoUrl={driver.customLogoUrl || driver.photoUrl} />
           </div>
       </div>
 

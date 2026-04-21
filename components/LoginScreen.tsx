@@ -14,7 +14,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, brandedDriver }) => 
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isFormVisible, setIsFormVisible] = useState(!brandedDriver); // Se não tiver marca, mostra form direto
+    const [isFormVisible, setIsFormVisible] = useState(true); // Sempre mostra o formulário para agilizar o acesso do motorista
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -72,81 +72,54 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, brandedDriver }) => 
                      )}
                 </div>
 
-                {!isFormVisible ? (
-                    <div className="w-full max-w-sm space-y-6 animate-slideUp flex flex-col items-center">
-                        <div className="text-center">
-                            <h2 className="text-white text-xl font-bold">Olá, {brandedDriver?.name}!</h2>
-                            <p className="text-gray-400 text-sm leading-relaxed mt-2">Pronto para iniciar sua jornada de hoje? Acesse sua ferramenta de gestão.</p>
+                <div className="w-full max-w-sm mx-auto animate-fadeIn flex flex-col items-center">
+                    <form onSubmit={handleSubmit} className="w-full space-y-4">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i className="fa-solid fa-envelope text-gray-500"></i>
+                            </div>
+                            <input
+                                type="email"
+                                placeholder="Seu E-mail"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="bg-gray-900/80 p-4 pl-12 w-full text-white placeholder-gray-500 rounded-2xl focus:ring-2 focus:ring-primary border border-gray-800 backdrop-blur-md transition-all font-bold"
+                                required
+                            />
+                        </div>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i className="fa-solid fa-lock text-gray-500"></i>
+                            </div>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Sua Senha"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="bg-gray-900/80 p-4 pl-12 pr-12 w-full text-white placeholder-gray-500 rounded-2xl focus:ring-2 focus:ring-primary border border-gray-800 backdrop-blur-md transition-all font-bold"
+                                required
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500"
+                            >
+                                <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                            </button>
                         </div>
                         
-                        <button 
-                            onClick={() => setIsFormVisible(true)}
-                            className="w-full bg-primary hover:bg-primary-hover text-white font-black py-5 rounded-2xl shadow-2xl transform active:scale-95 transition-all text-lg uppercase"
+                        {error && <p className="text-red-400 text-xs font-bold bg-red-950/30 p-2 rounded-lg">{error}</p>}
+                        
+                        <button
+                            type="submit"
+                            className="w-full bg-primary hover:bg-primary-hover text-white font-black py-5 rounded-2xl shadow-xl transform active:scale-95 transition-all uppercase tracking-tight"
                         >
-                            Entrar no Sistema
+                            Acessar Agora
                         </button>
+                    </form>
 
-                        <LegalNotice />
-                    </div>
-                ) : (
-                    <div className="w-full max-w-sm mx-auto animate-fadeIn flex flex-col items-center">
-                        <form onSubmit={handleSubmit} className="w-full space-y-4">
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <i className="fa-solid fa-envelope text-gray-500"></i>
-                                </div>
-                                <input
-                                    type="email"
-                                    placeholder="Seu E-mail"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="bg-gray-900/80 p-4 pl-12 w-full text-white placeholder-gray-500 rounded-2xl focus:ring-2 focus:ring-primary border border-gray-800 backdrop-blur-md transition-all font-bold"
-                                    required
-                                />
-                            </div>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <i className="fa-solid fa-lock text-gray-500"></i>
-                                </div>
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Sua Senha"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="bg-gray-900/80 p-4 pl-12 pr-12 w-full text-white placeholder-gray-500 rounded-2xl focus:ring-2 focus:ring-primary border border-gray-800 backdrop-blur-md transition-all font-bold"
-                                    required
-                                />
-                                <button 
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500"
-                                >
-                                    <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-                                </button>
-                            </div>
-                            
-                            {error && <p className="text-red-400 text-xs font-bold bg-red-950/30 p-2 rounded-lg">{error}</p>}
-                            
-                            <button
-                                type="submit"
-                                className="w-full bg-primary hover:bg-primary-hover text-white font-black py-5 rounded-2xl shadow-xl transform active:scale-95 transition-all uppercase tracking-tight"
-                            >
-                                Acessar Agora
-                            </button>
-                        </form>
-
-                        <LegalNotice />
-
-                        {brandedDriver && (
-                            <button 
-                                onClick={() => setIsFormVisible(false)}
-                                className="mt-8 text-xs text-gray-500 hover:text-white underline font-bold uppercase tracking-widest transition-colors"
-                            >
-                                Voltar para a Home
-                            </button>
-                        )}
-                    </div>
-                )}
+                    <LegalNotice />
+                </div>
             </div>
             
             <div className="relative z-10 w-full mt-auto">

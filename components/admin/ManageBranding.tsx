@@ -124,14 +124,14 @@ const ManageBranding: React.FC<ManageBrandingProps> = ({ currentDriver, onUpdate
                 <i className="fa-solid fa-rocket text-white text-2xl"></i>
             </div>
             <div>
-                <h3 className="text-2xl font-black text-white italic uppercase tracking-tight">Seu Link de Divulgação</h3>
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Compartilhe para receber chamadas diretas</p>
+                <h3 className="text-2xl font-black text-white italic uppercase tracking-tight">Seu Portal de Acesso</h3>
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Sua ferramenta de gestão personalizada</p>
             </div>
         </div>
 
         <div className="space-y-6 relative z-10">
             <div className="bg-black/50 border border-gray-700/50 rounded-2xl p-5 flex flex-col items-center">
-                <p className="text-[10px] text-primary font-black uppercase mb-3 tracking-[0.2em]">Endereço Público do seu App:</p>
+                <p className="text-[10px] text-primary font-black uppercase mb-3 tracking-[0.2em]">Endereço Seguro do seu Portal:</p>
                 <div className="text-white font-mono font-bold text-base md:text-lg break-all text-center">
                     <span className="opacity-40">{baseUrl}/</span>
                     <span className="text-primary underline decoration-2 underline-offset-8 decoration-primary/50">{slug || '...'}</span>

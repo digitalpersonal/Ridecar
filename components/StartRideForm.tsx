@@ -359,7 +359,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                 <i className="fa-solid fa-bars text-xl"></i>
             </button>
             <div className="bg-gray-900/90 backdrop-blur-md rounded-full px-5 py-2 border border-primary/20 shadow-2xl pointer-events-auto">
-                 <RideCarLogo className="h-8 w-auto" horizontal={true} hideIcon={true} customName={currentDriver.brandName} customLogoUrl={currentDriver.customLogoUrl} />
+                 <RideCarLogo className="h-8 w-auto" horizontal={true} customName={currentDriver.brandName} customLogoUrl={currentDriver.customLogoUrl || currentDriver.photoUrl} />
             </div>
             <div className="w-12 h-12 bg-gray-900/90 backdrop-blur-md rounded-full border border-gray-700 overflow-hidden shadow-2xl pointer-events-auto">
                  {currentDriver.photoUrl ? <img src={currentDriver.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600"><i className="fa-solid fa-user"></i></div>}

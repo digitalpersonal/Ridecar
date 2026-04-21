@@ -6,7 +6,6 @@ import StartRideForm from './components/StartRideForm';
 import InRideDisplay from './components/InRideDisplay';
 import AdminPanel from './components/admin/AdminPanel';
 import LoginScreen from './components/LoginScreen';
-import PublicProfile from './components/PublicProfile';
 import LoadingSpinner from './components/LoadingSpinner';
 import { supabase } from './supabaseClient';
 
@@ -225,10 +224,7 @@ function App() {
     </div>
   );
 
-  // Se não estiver logado e houver um contexto de marca, mostra o perfil público para o cliente
-  if (!currentDriver && brandedContext) return <PublicProfile driver={brandedContext} />;
-  
-  // Se não estiver logado, mostra tela de login (com suporte a branding se houver slug)
+  // Se não estiver logado, mostra tela de login (com suporte a branding se houver slug ou URL da equipe)
   if (!currentDriver) return <LoginScreen onLogin={(e, p) => {
       const driver = drivers.find(d => d.email === e && d.password === p);
       if (driver) { 
