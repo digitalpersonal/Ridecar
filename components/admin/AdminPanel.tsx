@@ -20,6 +20,7 @@ interface AdminPanelProps {
   currentDriver: Driver | null;
   initialTab?: string;
   onUpdateBranding: (updates: Partial<Driver>) => Promise<{ success: boolean; error?: string }>;
+  onRefresh: () => Promise<void>;
 }
 
 type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'admins' | 'branding' | 'financials';
@@ -27,9 +28,16 @@ type AdminTab = 'dashboard' | 'history' | 'passengers' | 'drivers' | 'admins' | 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
     rideHistory, passengers, drivers, onSaveDrivers, 
     onSavePassengers, onExitAdminPanel, 
-    currentDriver, initialTab = 'dashboard', onUpdateBranding 
+    currentDriver, initialTab = 'dashboard', onUpdateBranding, onRefresh
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+      setIsRefreshing(true);
+      await onRefresh();
+      setTimeout(() => setIsRefreshing(false), 1000);
+  };
 
   useEffect(() => {
     const validTabs: AdminTab[] = ['dashboard', 'history', 'passengers', 'drivers', 'admins', 'branding', 'financials'];
@@ -81,9 +89,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Acessado por: <span className="text-gray-300">{currentDriver?.name}</span></p>
             </div>
         </div>
-        <button onClick={onExitAdminPanel} className="bg-gray-800 text-gray-400 hover:text-white border border-gray-700 font-black py-2 px-6 rounded-xl text-[10px] transition-all uppercase tracking-widest flex items-center active:scale-95 shadow-lg">
-          <i className="fa-solid fa-arrow-left mr-2"></i> Voltar
-        </button>
+        <div className="flex items-center gap-3 no-print">
+            <button 
+                onClick={handleManualRefresh} 
+                disabled={isRefreshing}
+                className={`bg-gray-800 text-gray-400 hover:text-white border border-gray-700 font-black py-2 px-4 rounded-xl text-[10px] transition-all uppercase tracking-widest flex items-center active:scale-95 shadow-lg ${isRefreshing ? 'animate-pulse' : ''}`}
+            >
+                <i className={`fa-solid fa-arrows-rotate mr-2 ${isRefreshing ? 'animate-spin' : ''}`}></i> 
+                {isRefreshing ? 'Sincronizando...' : 'Sincronizar'}
+            </button>
+            <button onClick={onExitAdminPanel} className="bg-gray-800 text-gray-400 hover:text-white border border-gray-700 font-black py-2 px-6 rounded-xl text-[10px] transition-all uppercase tracking-widest flex items-center active:scale-95 shadow-lg">
+                <i className="fa-solid fa-arrow-left mr-2"></i> Voltar
+            </button>
+        </div>
       </div>
       
       <div className="p-3 border-b border-gray-700 bg-gray-800 shadow-inner">

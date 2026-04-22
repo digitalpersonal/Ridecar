@@ -94,6 +94,39 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      
+      @media print {
+        @page { margin: 1cm; }
+        .no-print { display: none !important; }
+        .print-only { display: block !important; }
+        body { 
+          background: white !important; 
+          color: black !important; 
+          position: relative !important;
+          overflow: visible !important;
+        }
+        #root { 
+          overflow: visible !important; 
+          position: relative !important;
+          background: white !important;
+          color: black !important;
+        }
+        .bg-gray-900, .bg-gray-800, .bg-gray-700, .bg-gray-950, .bg-black { 
+          background: white !important; 
+          color: black !important;
+          border-color: #eee !important;
+        }
+        .text-white, .text-gray-300, .text-gray-400 { color: black !important; }
+        .shadow-2xl, .shadow-xl, .shadow-lg, .shadow-md, .shadow-inner { shadow: none !important; }
+        .border-gray-700, .border-gray-800, .border-gray-600 { border-color: #eee !important; }
+        
+        .printable-report {
+          display: block !important;
+          width: 100% !important;
+          color: black !important;
+        }
+      }
+      .print-only { display: none; }
     </style>
   <script type="importmap">
 {

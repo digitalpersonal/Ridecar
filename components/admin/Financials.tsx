@@ -32,28 +32,31 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
     useEffect(() => {
         if (!isAdmin && currentDriver) {
             setSelectedDriverId(currentDriver.id);
+        } else if (isAdmin) {
+            setSelectedDriverId('all'); // Admins começam vendo tudo por padrão
         }
-        // If the user is an admin, they can choose, so we don't set it automatically.
     }, [isAdmin, currentDriver]);
 
 
     const driverFinancials = useMemo(() => {
-        if (!selectedDriverId) return null;
+        const finishedRides = rideHistory.filter(ride => !!ride.endTime);
+        const ridesToProcess = selectedDriverId === 'all' 
+            ? finishedRides 
+            : finishedRides.filter(ride => ride.driverId === selectedDriverId);
 
-        const driverRides = rideHistory.filter(ride => ride.driverId === selectedDriverId);
-
-        if (driverRides.length === 0) {
+        if (ridesToProcess.length === 0) {
             return {
                 totalRevenue: 0,
                 totalRides: 0,
                 averageTicket: 0,
+                totalDistance: 0,
                 rides: []
             };
         }
 
-        const totalRevenue = driverRides.reduce((sum, ride) => sum + ride.fare, 0);
-        const totalDistance = driverRides.reduce((sum, ride) => sum + ride.distance, 0);
-        const totalRides = driverRides.length;
+        const totalRevenue = ridesToProcess.reduce((sum, ride) => sum + ride.fare, 0);
+        const totalDistance = ridesToProcess.reduce((sum, ride) => sum + ride.distance, 0);
+        const totalRides = ridesToProcess.length;
         const averageTicket = totalRides > 0 ? totalRevenue / totalRides : 0;
 
         return {
@@ -61,16 +64,26 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
             totalDistance,
             totalRides,
             averageTicket,
-            rides: [...driverRides].reverse() // Show most recent first
+            rides: [...ridesToProcess].sort((a, b) => b.startTime - a.startTime)
         };
     }, [selectedDriverId, rideHistory]);
     
+    const handlePrint = () => {
+        window.print();
+    };
+
     const formatDate = (timestamp: number) => {
         return new Date(timestamp).toLocaleString('pt-BR', {
           day: '2-digit', month: '2-digit', year: 'numeric',
           hour: '2-digit', minute: '2-digit'
         });
     };
+
+    const selectedDriverName = useMemo(() => {
+        if (selectedDriverId === 'all') return 'Todos os Motoristas';
+        const driver = drivers.find(d => d.id === selectedDriverId);
+        return driver ? driver.name : '';
+    }, [selectedDriverId, drivers]);
 
     if (!currentDriver) {
         return (
@@ -82,26 +95,41 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
     }
 
     return (
-        <div>
-            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                <h3 className="text-2xl font-semibold text-white">
-                    {isAdmin ? 'Movimento Financeiro por Motorista' : 'Meu Movimento Financeiro'}
+        <div className="printable-report">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 no-print">
+                <h3 className="text-2xl font-black text-white italic uppercase tracking-tight">
+                    {isAdmin ? 'Movimento Financeiro' : 'Meu Movimento Financeiro'}
                 </h3>
-                {isAdmin && (
-                    <select
-                        value={selectedDriverId}
-                        onChange={(e) => setSelectedDriverId(e.target.value)}
-                        className="w-full md:w-auto bg-gray-700 p-3 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none"
+                <div className="flex gap-2 w-full md:w-auto">
+                    {isAdmin && (
+                        <select
+                            value={selectedDriverId}
+                            onChange={(e) => setSelectedDriverId(e.target.value)}
+                            className="bg-gray-700 p-3 text-white rounded-xl border border-gray-600 focus:ring-2 focus:ring-primary font-bold text-sm"
+                        >
+                            <option value="all">Todos os Motoristas</option>
+                            {drivers.map(driver => (
+                                <option key={driver.id} value={driver.id}>{driver.name}</option>
+                            ))}
+                        </select>
+                    )}
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-primary hover:bg-primary-hover text-white font-black py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95 text-xs uppercase tracking-widest flex items-center shrink-0"
                     >
-                        <option value="">Selecione um motorista</option>
-                        {drivers.map(driver => (
-                            <option key={driver.id} value={driver.id}>{driver.name}</option>
-                        ))}
-                    </select>
-                )}
+                        <i className="fa-solid fa-print mr-2"></i> PDF
+                    </button>
+                </div>
             </div>
 
-            {!selectedDriverId ? (
+            {/* Cabeçalho de Impressão */}
+            <div className="print-only mb-8 border-b-2 border-gray-200 pb-4">
+                <h1 className="text-3xl font-black uppercase italic">Relatório Financeiro - RideCar</h1>
+                <p className="text-gray-600 font-bold uppercase tracking-widest">Motorista: {selectedDriverName}</p>
+                <p className="text-gray-500 text-xs">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
+            </div>
+
+            {!selectedDriverId && isAdmin ? (
                 <div className="text-center py-16 bg-gray-900/50 rounded-lg">
                     <i className="fa-solid fa-hand-pointer text-4xl text-gray-500 mb-4"></i>
                     <p className="text-gray-400">

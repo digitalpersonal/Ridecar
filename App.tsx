@@ -341,11 +341,17 @@ function App() {
                         return { success: false, error: 'Erro ao salvar: ' + error.message };
                     }
 
-                    setCurrentDriver(upd); 
+                    setCurrentDriver(upd as Driver); 
                     localStorage.setItem(CURRENT_DRIVER_STORAGE_KEY, JSON.stringify(upd));
                     return { success: true };
                 } catch (e) {
                     return { success: false, error: 'Ocorreu um erro inesperado.' };
+                }
+            }}
+            onRefresh={async () => {
+                if (currentDriver) {
+                    await fetchGlobalData();
+                    await fetchDriverSpecificData(currentDriver);
                 }
             }} 
         />
