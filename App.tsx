@@ -26,6 +26,18 @@ function App() {
   const [brandedContext, setBrandedContext] = useState<Driver | null>(null); 
   const [isInitializing, setIsInitializing] = useState(true);
 
+  // Impedir fechamento acidental durante a corrida
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (appState === AppState.IN_RIDE && currentRide) {
+        e.preventDefault();
+        e.returnValue = 'Você tem uma corrida em andamento. Deseja realmente sair?';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [appState, currentRide]);
+
   // Aplica cores dinâmicas baseadas no motorista atual ou no contexto da página (White Label)
   useEffect(() => {
     const driver = currentDriver || brandedContext;
@@ -260,7 +272,11 @@ function App() {
             }} 
             onComplete={() => { setCurrentRide(null); localStorage.removeItem(CURRENT_RIDE_STORAGE_KEY); setAppState(AppState.START); }} 
             onUpdateDestination={(nd, nf) => {
-              setCurrentRide(p => p ? { ...p, destination: nd, fare: nf } : null);
+              setCurrentRide(p => {
+                const updated = p ? { ...p, destination: nd, fare: nf } : null;
+                if (updated) localStorage.setItem(CURRENT_RIDE_STORAGE_KEY, JSON.stringify(updated));
+                return updated;
+              });
               setRideHistory(p => p.map(r => r.id === currentRide.id ? { ...r, destination: nd, fare: nf } : r));
               supabase.from('rides').update({ destination_json: nd, fare: nf }).eq('id', currentRide.id);
             }} 

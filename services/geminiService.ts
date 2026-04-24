@@ -42,21 +42,21 @@ export const parseRideInfoFromText = async (text: string, context: 'passenger' |
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `CONTEXTO DE EXTRAÇÃO: ${contextInstruction}\nTexto: "${text}"`,
+      model: "gemini-1.5-flash",
+      contents: `Contexto: ${contextInstruction}\nTexto capturado: "${text}"`,
       config: {
-        systemInstruction: `Você é um extrator de dados JSON de ELITE para motoristas brasileiros (Uber/99).
-        Sua missão é extrair informações de viagens a partir de áudios que podem ser confusos.`,
+        systemInstruction: `Você é um extrator de dados ultra-rápido. Extraia os dados do áudio de um motorista para preenchimento de campos de uma corrida.
+        Converta o texto em JSON seguindo estritamente o esquema. Se não encontrar um dado, ignore-o.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            passengerName: { type: Type.STRING, description: "Nome completo ou parcial do passageiro" },
-            whatsapp: { type: Type.STRING, description: "Número de telefone ou whatsapp, apenas números" },
-            destinationAddress: { type: Type.STRING, description: "Rua, Avenida ou Nome do Estabelecimento (ex: Banco do Brasil, Hospital Regional)" },
-            destinationNumber: { type: Type.STRING, description: "Número do local de destino" },
-            destinationCity: { type: Type.STRING, description: "Cidade de destino (ex: Guaranésia)" },
-            fare: { type: Type.STRING, description: "Valor da tarifa/corrida, apenas números" },
+            passengerName: { type: Type.STRING },
+            whatsapp: { type: Type.STRING },
+            destinationAddress: { type: Type.STRING },
+            destinationNumber: { type: Type.STRING },
+            destinationCity: { type: Type.STRING },
+            fare: { type: Type.STRING }
           }
         }
       }

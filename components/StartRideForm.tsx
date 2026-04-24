@@ -74,7 +74,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
         recognition.lang = 'pt-BR';
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
-        recognition.continuous = true; 
+        recognition.continuous = false; // Mudar para false para capturar 'uma frase' e parar rápido
 
         accumulatedTextRef.current = '';
 
@@ -82,14 +82,14 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             isRecordingRef.current = true;
             setIsRecording(true);
             setActiveVoiceContext(context);
-            setVoiceStatus(context === 'passenger' ? "Diga o Nome e o WhatsApp..." : "Diga o Destino, Cidade e Valor...");
+            setVoiceStatus("Ouvindo... fale agora");
         };
 
         const processFinalTranscription = async (text: string, context: 'passenger' | 'route' | 'all') => {
             const finalQuery = text.trim();
             console.log(`BRAIN: Analisando transcrição [${context}]:`, finalQuery);
             
-            if (!finalQuery || finalQuery.length < 3) {
+            if (!finalQuery || finalQuery.length < 2) {
                 setVoiceStatus(null);
                 isRecordingRef.current = false;
                 setIsRecording(false);
@@ -97,14 +97,12 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                 return;
             }
             
-            setVoiceStatus("Extraindo dados...");
+            setVoiceStatus("Identificando dados...");
             const parsed = await parseRideInfoFromText(finalQuery, context);
             
             if (parsed) {
                 console.log("BRAIN: Dados extraídos:", parsed);
-                // Armazenamos o texto final para debug/feedback se necessário
-                const successMsg = context === 'passenger' ? "Passageiro OK!" : (context === 'route' ? "Rota OK!" : "Viagem OK!");
-                setVoiceStatus(successMsg);
+                setVoiceStatus("Dados aplicados!");
                 
                 const isValid = (val: any) => 
                     val !== null && 
@@ -132,40 +130,25 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                             setPassenger(prev => ({ ...prev, whatsapp: cleanWa }));
                         }
                     }
-                    if (context === 'passenger') {
-                         setVoiceStatus("Passageiro: " + (parsed.passengerName || "Identificado"));
-                    }
                 }
 
                 // Atualização do Destino e Cidade (Contexto Rota ou Geral)
                 if (context === 'route' || context === 'all') {
-                    const hasAddress = isValid(parsed.destinationAddress);
-                    const hasCity = isValid(parsed.destinationCity);
-                    const hasFare = isValid(parsed.fare);
-
-                    if (hasAddress) setDestinationAddress(String(parsed.destinationAddress));
+                    if (isValid(parsed.destinationAddress)) setDestinationAddress(String(parsed.destinationAddress));
                     if (isValid(parsed.destinationNumber)) setDestinationNumber(String(parsed.destinationNumber));
-
-                    if (hasCity) {
-                        setDestinationCity(String(parsed.destinationCity));
-                    }
+                    if (isValid(parsed.destinationCity)) setDestinationCity(String(parsed.destinationCity));
                     
-                    if (hasFare) {
+                    if (isValid(parsed.fare)) {
                         let cleanFare = String(parsed.fare).replace(/[^\d.,]/g, '').replace(',', '.');
                         if (cleanFare && !isNaN(parseFloat(cleanFare))) {
                             setCustomFare(cleanFare);
                         }
                     }
-                    if (context === 'route') {
-                        setVoiceStatus("Destino: " + (parsed.destinationAddress || "Capturado"));
-                    }
                 }
-                
-                if (context === 'all') setVoiceStatus("Corrida configurada!");
-                setTimeout(() => setVoiceStatus(null), 5000);
+                setTimeout(() => setVoiceStatus(null), 2000);
             } else {
-                setVoiceStatus("Sem dados claros no áudio.");
-                setTimeout(() => setVoiceStatus(null), 5000);
+                setVoiceStatus("Não entendi o áudio.");
+                setTimeout(() => setVoiceStatus(null), 3000);
             }
             isRecordingRef.current = false;
             setIsRecording(false);
@@ -176,9 +159,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             let interim = '';
             let final = '';
             
-            // Usamos o resultIndex para processar apenas os novos resultados se necessário,
-            // mas como estamos reconstruindo o 'final' a partir do array completo,
-            // garantimos que não haja duplicação limpando a variável 'final' no topo.
             for (let i = 0; i < event.results.length; ++i) {
                 const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
@@ -191,7 +171,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             const totalText = (final + interim).trim();
             accumulatedTextRef.current = totalText;
             
-            // Mostramos o que já foi capturado para o usuário ter feedback em tempo real
             setVoiceStatus("Captado: " + (totalText || "fale..."));
 
             if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
@@ -199,7 +178,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                 if (isRecordingRef.current) {
                     recognition.stop();
                 }
-            }, 2000); // Reduzido para 2s para corte instantâneo e prático
+            }, 1300); // 1.3s de silêncio para cortar rápido
         };
 
         recognition.onerror = (event: any) => {
