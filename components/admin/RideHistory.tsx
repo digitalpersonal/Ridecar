@@ -116,35 +116,25 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory, currentDriver, d
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <h3 className="text-2xl font-black text-white italic uppercase tracking-tight flex items-center">
+            <h3 className="text-2xl font-bold text-white flex items-center">
                 <i className="fa-solid fa-clock-rotate-left mr-3 text-primary"></i>
-                Histórico
+                Histórico Detalhado
             </h3>
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Total de {filteredHistory.length} registros</p>
+            <p className="text-sm text-gray-400">Total de {filteredHistory.length} corridas registradas</p>
         </div>
         <div className="flex bg-gray-900 p-1 rounded-xl w-full md:w-auto">
-            <button onClick={() => setView('list')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${view === 'list' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+            <button onClick={() => setView('list')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'list' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                 <i className="fa-solid fa-list-ul mr-2"></i> LISTA
             </button>
-            <button onClick={() => setView('map')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-[10px] font-black transition-all uppercase tracking-widest ${view === 'map' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+            <button onClick={() => setView('map')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'map' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                 <i className="fa-solid fa-earth-americas mr-2"></i> MAPA
-            </button>
-            <button onClick={() => window.print()} className="ml-2 px-4 py-2 bg-gray-800 text-white rounded-lg text-[10px] font-black border border-gray-700 hover:bg-gray-700 uppercase tracking-widest">
-                <i className="fa-solid fa-print"></i>
             </button>
         </div>
       </div>
 
-      <div className="printable-report">
-        {/* Cabeçalho de Impressão */}
-        <div className="print-only mb-8 border-b-2 border-gray-200 pb-4">
-            <h1 className="text-3xl font-black uppercase italic">Relatório de Viagens - RideCar</h1>
-            <p className="text-gray-500 text-xs mt-1">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
-        </div>
-
-        {view === 'list' ? (
+      {view === 'list' ? (
         <div className="grid grid-cols-1 gap-4">
           {[...filteredHistory].reverse().map((ride) => {
             const isExpanded = expandedRideId === ride.id;
@@ -257,7 +247,10 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory, currentDriver, d
                         </div>
                     </div>
 
-                    <div className="mt-6 flex justify-end gap-3 no-print">
+                    <div className="mt-6 flex justify-end gap-3">
+                         <button className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-xs font-bold transition-all">
+                            <i className="fa-solid fa-print mr-2"></i> IMPRIMIR RECIBO
+                         </button>
                          <button className="px-4 py-2 bg-primary/20 hover:bg-primary/30 text-primary rounded-lg text-xs font-bold border border-primary/30 transition-all">
                             <i className="fa-solid fa-share-nodes mr-2"></i> COMPARTILHAR
                          </button>
@@ -269,11 +262,10 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory, currentDriver, d
           })}
         </div>
       ) : (
-        <div className="h-[65vh] bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 no-print">
+        <div className="h-[65vh] bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-700">
             <RideHistoryMap rides={filteredHistory} />
         </div>
       )}
-      </div>
     </div>
   );
 };

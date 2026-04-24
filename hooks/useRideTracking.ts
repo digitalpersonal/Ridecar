@@ -21,8 +21,8 @@ const haversineDistance = (coords1: GeolocationCoordinates, coords2: Geolocation
 };
 
 
-export function useRideTracking(isActive: boolean, initialDistance: number = 0) {
-  const [distance, setDistance] = useState(initialDistance);
+export function useRideTracking(isActive: boolean) {
+  const [distance, setDistance] = useState(0);
   const [currentPosition, setCurrentPosition] = useState<GeolocationCoordinates | null>(null);
   const [path, setPath] = useState<GeolocationCoordinates[]>([]);
   const lastPositionRef = useRef<GeolocationCoordinates | null>(null);

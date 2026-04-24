@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Ride, Driver, GeolocationCoordinates, FareRule, AddressSuggestion } from '../types';
 import { useRideTracking } from '../hooks/useRideTracking';
-import { useWakeLock } from '../hooks/useWakeLock';
 import { getCoordinatesForAddress, geocodeAddress, getAddressFromCoordinates } from '../services/geocodingService';
 import { useDebounce } from '../hooks/useDebounce';
 import { WhatsAppIcon, ExpandIcon, CompressIcon, PinIcon, RideCarLogo } from './icons';
@@ -42,32 +41,8 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
   const [isSearching, setIsSearching] = useState(false);
   const debouncedAddress = useDebounce(editAddress, 500);
 
-  const { distance, currentPosition, path } = useRideTracking(!isRideFinished, ride.distance);
+  const { distance, currentPosition, path } = useRideTracking(!isRideFinished);
   const normalize = (s: string) => s ? s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
-
-  // Ativa o Wake Lock para impedir que a tela apague durante a corrida
-  useWakeLock(!isRideFinished);
-
-  // Persiste a distância atual no localStorage periodicamente para evitar perda em caso de recarregamento
-  useEffect(() => {
-    if (!isRideFinished && distance > 0) {
-      const interval = setInterval(() => {
-        const storedRide = localStorage.getItem('ridecar_current_ride');
-        if (storedRide) {
-          try {
-            const parsed = JSON.parse(storedRide);
-            if (parsed.id === ride.id) {
-              parsed.distance = distance;
-              localStorage.setItem('ridecar_current_ride', JSON.stringify(parsed));
-            }
-          } catch (e) {
-            console.error("Erro ao persistir distância:", e);
-          }
-        }
-      }, 5000); // Salva a cada 5 segundos
-      return () => clearInterval(interval);
-    }
-  }, [distance, isRideFinished, ride.id]);
 
   useEffect(() => {
     const fetchDestinationCoords = async () => {
