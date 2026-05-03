@@ -14,9 +14,10 @@ interface InRideDisplayProps {
   onSendWhatsApp: () => void;
   onComplete: () => void;
   onUpdateDestination: (destination: { address: string; city: string }, fare: number) => void;
+  availableCities: FareRule[];
 }
 
-const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide, onSendWhatsApp, onComplete, onUpdateDestination }) => {
+const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide, onSendWhatsApp, onComplete, onUpdateDestination, availableCities }) => {
   // Guard clause initial check
   if (!ride || !driver || !ride.destination || !ride.passenger) {
     console.warn("InRideDisplay: Dados incompletos. Encerrando exibição.");
@@ -163,33 +164,36 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
                           {driver.photoUrl ? <img src={driver.photoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-700"><i className="fa-solid fa-user text-xl"></i></div>}
                       </div>
                       <div className="overflow-hidden">
-                          <p className="text-[9px] text-primary font-black uppercase tracking-[0.2em]">Motorista ({driver.brandName || 'RideCar'})</p>
+                          <p className="text-[9px] text-primary font-black uppercase tracking-[0.2em]">Motorista {driver.brandName ? ` • ${driver.brandName}` : ''}</p>
                           <p className="text-xl font-black text-white leading-tight truncate">{driver.name}</p>
                           <div className="flex items-center mt-0.5 space-x-2">
                               <p className="text-[10px] text-gray-400 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">{driver.carModel}</p>
                               <span className="font-mono text-[9px] border border-gray-700 bg-gray-800 px-1.5 py-0.5 rounded text-white">{driver.licensePlate}</span>
+                              {driver.city && <span className="text-[9px] text-gray-500 font-bold uppercase">• {driver.city}</span>}
                           </div>
                       </div>
                   </div>
                   {!isRideFinished && (
                       <div className="bg-primary/10 p-2.5 rounded-xl border border-primary/20 text-center animate-pulse shadow-md shrink-0 flex flex-col items-center justify-center min-w-[70px]">
-                          <p className="text-[7px] text-primary font-black uppercase mb-0.5">Viagem</p>
+                          <p className="text-[7px] text-primary font-black uppercase mb-0.5">Tempo</p>
                           <p className="text-base font-black text-white font-mono leading-none">{formatTime(displayTime)}</p>
                       </div>
                   )}
               </div>
 
               {/* Box Passageiro */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-3 flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 shrink-0">
-                      <i className="fa-solid fa-user-astronaut"></i>
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex items-center space-x-4 shadow-inner">
+                  <div className="w-12 h-12 rounded-full bg-gray-800/50 border border-gray-700 flex items-center justify-center text-primary/70 shrink-0 shadow-lg">
+                      <i className="fa-solid fa-user-astronaut text-xl"></i>
                   </div>
                   <div className="overflow-hidden w-full">
-                      <p className="text-[8px] text-gray-500 font-black uppercase tracking-[0.1em] mb-0.5">Passageiro</p>
-                      <p className="text-base font-black text-white truncate">{ride.passenger.name}</p>
-                      <div className="flex items-center mt-0.5">
-                          <i className="fa-brands fa-whatsapp text-green-500 mr-1.5 text-[10px]"></i>
-                          <p className="text-[10px] text-gray-300 font-mono tracking-widest">{ride.passenger.whatsapp}</p>
+                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-[0.2em] mb-0.5">Passageiro</p>
+                      <p className="text-xl font-black text-white truncate leading-tight">{ride.passenger.name}</p>
+                      <div className="flex items-center mt-1">
+                          <div className="flex items-center bg-green-500/10 px-2 py-0.5 rounded-md border border-green-500/20">
+                              <i className="fa-brands fa-whatsapp text-green-500 mr-2 text-xs"></i>
+                              <p className="text-xs text-gray-300 font-mono tracking-widest">{ride.passenger.whatsapp}</p>
+                          </div>
                       </div>
                   </div>
               </div>

@@ -142,7 +142,15 @@ function App() {
       let passengerQuery = supabase.from('passengers').select('*');
       if (driver.role !== 'admin') passengerQuery = passengerQuery.eq('driver_id', driver.id);
       const { data: dbPassengers } = await passengerQuery;
-      if (dbPassengers) setSavedPassengers(dbPassengers);
+      if (dbPassengers) {
+        setSavedPassengers(dbPassengers.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          whatsapp: p.whatsapp,
+          cpf: p.cpf,
+          driverId: p.driver_id
+        })));
+      }
 
       // Histórico
       let rideQuery = supabase.from('rides').select('*').order('start_time', { ascending: false });
@@ -260,10 +268,15 @@ function App() {
             }} 
             onComplete={() => { setCurrentRide(null); localStorage.removeItem(CURRENT_RIDE_STORAGE_KEY); setAppState(AppState.START); }} 
             onUpdateDestination={(nd, nf) => {
-              setCurrentRide(p => p ? { ...p, destination: nd, fare: nf } : null);
-              setRideHistory(p => p.map(r => r.id === currentRide.id ? { ...r, destination: nd, fare: nf } : r));
-              supabase.from('rides').update({ destination_json: nd, fare: nf }).eq('id', currentRide.id);
+              const updatedRide = currentRide ? { ...currentRide, destination: nd, fare: nf } : null;
+              if (updatedRide) {
+                  setCurrentRide(updatedRide);
+                  setRideHistory(p => p.map(r => r.id === currentRide.id ? updatedRide : r));
+                  supabase.from('rides').update({ destination_json: nd, fare: nf }).eq('id', currentRide.id);
+                  localStorage.setItem(CURRENT_RIDE_STORAGE_KEY, JSON.stringify(updatedRide));
+              }
             }} 
+            availableCities={fareRules}
         />
       )}
       {appState === AppState.ADMIN_PANEL && (
@@ -319,7 +332,54 @@ function App() {
                     alert("Erro crítico ao processar salvamento de motoristas.");
                 }
             }} 
-            onSavePassengers={setSavedPassengers} 
+            onSavePassengers={async (pList) => {
+                try {
+                    if (!currentDriver) return;
+                    
+                    const oldPassengerIds = savedPassengers.map(p => p.id).filter(id => !!id);
+                    const newPassengerIds = pList.map(p => p.id).filter(id => !!id);
+                    const deletedIds = oldPassengerIds.filter(id => !newPassengerIds.includes(id));
+
+                    // 1. Mapear para o formato do banco (snake_case)
+                    const mappedData = pList.map(p => ({
+                        id: p.id || undefined, // Deixa o Supabase gerar se for novo
+                        name: p.name,
+                        whatsapp: p.whatsapp,
+                        cpf: p.cpf,
+                        driver_id: p.driverId || currentDriver.id
+                    }));
+
+                    const { data, error: upsertError } = await supabase.from('passengers').upsert(mappedData).select();
+
+                    if (upsertError) {
+                        console.error("DATABASE ERROR (Passengers Upsert):", upsertError);
+                        alert(`Erro ao salvar passageiros: ${upsertError.message}`);
+                        return;
+                    }
+
+                    // 2. Deletar removidos
+                    if (deletedIds.length > 0) {
+                        await supabase.from('passengers').delete().in('id', deletedIds);
+                    }
+
+                    // 3. Atualizar estado local com os IDs retornados pelo banco
+                    if (data) {
+                        setSavedPassengers(data.map((p: any) => ({
+                            id: p.id,
+                            name: p.name,
+                            whatsapp: p.whatsapp,
+                            cpf: p.cpf,
+                            driverId: p.driver_id
+                        })));
+                    } else {
+                        setSavedPassengers(pList);
+                    }
+                    
+                    console.log("DATABASE: Passageiros sincronizados.");
+                } catch (err) {
+                    console.error("Erro ao salvar passageiros:", err);
+                }
+            }} 
             onExitAdminPanel={() => setAppState(AppState.START)} 
             currentDriver={currentDriver} 
             initialTab={initialDashboardTab} 

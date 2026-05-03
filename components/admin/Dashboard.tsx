@@ -7,19 +7,30 @@ interface DashboardProps {
   currentDriver: Driver | null;
 }
 
-const StatCard: React.FC<{title: string, value: string, icon: string, color?: string}> = ({ title, value, icon, color = 'orange' }) => (
-    <div className="bg-gray-700 p-6 rounded-lg border border-gray-600 shadow-lg">
-        <div className="flex items-center">
-            <div className={`p-3 bg-${color}-500/20 rounded-lg mr-4`}>
-                <i className={`fa-solid ${icon} text-${color}-400 text-2xl`}></i>
-            </div>
-            <div>
-                <p className="text-sm text-gray-400 font-medium uppercase tracking-wide">{title}</p>
-                <p className="text-2xl font-bold text-white">{value}</p>
+const StatCard: React.FC<{title: string, value: string, icon: string, color?: string}> = ({ title, value, icon, color = 'orange' }) => {
+    const colorClasses: Record<string, string> = {
+        green: 'bg-green-500/20 text-green-400',
+        orange: 'bg-orange-500/20 text-orange-400',
+        blue: 'bg-blue-500/20 text-blue-400',
+        gray: 'bg-gray-500/20 text-gray-400',
+    };
+
+    const selectedColor = colorClasses[color] || colorClasses.orange;
+
+    return (
+        <div className="bg-gray-700 p-6 rounded-lg border border-gray-600 shadow-lg">
+            <div className="flex items-center">
+                <div className={`p-3 rounded-lg mr-4 ${selectedColor.split(' ')[0]}`}>
+                    <i className={`fa-solid ${icon} ${selectedColor.split(' ')[1]} text-2xl`}></i>
+                </div>
+                <div>
+                    <p className="text-sm text-gray-400 font-medium uppercase tracking-wide">{title}</p>
+                    <p className="text-2xl font-bold text-white">{value}</p>
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 const Dashboard: React.FC<DashboardProps> = ({ rideHistory, currentDriver }) => {
   const [copied, setCopied] = useState(false);
