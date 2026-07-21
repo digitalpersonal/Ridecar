@@ -126,7 +126,7 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
       </div>
 
       {/* MAPA EM TEMPO REAL */}
-      <div className={`relative w-full z-0 transition-all duration-500 ease-in-out ${isMapExpanded ? 'h-screen' : 'h-[50vh]'}`}>
+      <div className={`w-full z-0 transition-all duration-500 ease-in-out ${isMapExpanded ? 'absolute inset-0 h-screen' : 'relative flex-grow h-1/2'}`}>
         <RideMap 
             startLocation={ride.startLocation} 
             currentLocation={currentPosition} 
@@ -134,20 +134,24 @@ const InRideDisplay: React.FC<InRideDisplayProps> = ({ ride, driver, onStopRide,
             destination={ride.destination} 
             destinationCoords={destinationCoords} 
             driverName={driver.name} 
+            isExpanded={isMapExpanded}
         />
         {/* Sombra de transição do mapa */}
-        <div className="absolute bottom-0 w-full h-16 bg-gradient-to-t from-gray-950 to-transparent z-[1000] pointer-events-none"></div>
-
-        {/* Botão de Fechar Mapa Expandido */}
-        {isMapExpanded && (
-            <button onClick={() => setIsMapExpanded(false)} className="absolute top-1/2 right-6 -translate-y-1/2 z-[1000] p-4 bg-gray-900/90 rounded-full text-white backdrop-blur-xl shadow-2xl active:scale-90 border border-white/10 transition-transform">
-                <CompressIcon className="w-8 h-8" />
-            </button>
+        {!isMapExpanded && (
+            <div className="absolute bottom-0 w-full h-16 bg-gradient-to-t from-gray-950 to-transparent z-[1000] pointer-events-none"></div>
         )}
+
+        {/* Botão de Fechar/Abrir Mapa Expandido */}
+        <button 
+            onClick={() => setIsMapExpanded(!isMapExpanded)} 
+            className={`absolute z-[1000] p-3 bg-gray-900/90 rounded-full text-white backdrop-blur-xl shadow-2xl active:scale-90 border border-white/10 transition-all duration-500 ${isMapExpanded ? 'top-24 right-4' : 'bottom-6 right-4'}`}
+        >
+            {isMapExpanded ? <CompressIcon className="w-6 h-6 text-primary" /> : <ExpandIcon className="w-6 h-6 text-primary" />}
+        </button>
       </div>
       
       {/* CARD PRINCIPAL COM DADOS (BOTTOM SHEET) */}
-      <div className={`absolute bottom-0 w-full z-10 bg-gray-950 rounded-t-[40px] shadow-[0_-20px_50px_rgba(0,0,0,0.9)] transition-transform duration-500 ease-in-out ${isMapExpanded ? 'translate-y-[calc(100%-60px)]' : 'translate-y-0'} border-t border-white/10 flex flex-col h-[60vh] max-h-[600px]`}>
+      <div className={`w-full z-10 bg-gray-950 rounded-t-[40px] shadow-[0_-20px_50px_rgba(0,0,0,0.9)] transition-transform duration-500 ease-in-out ${isMapExpanded ? 'absolute bottom-0 translate-y-[calc(100%-60px)]' : 'relative translate-y-0'} border-t border-white/10 flex flex-col h-1/2 max-h-[600px]`}>
         {/* Linha indicadora de arraste */}
         <div className="w-full flex justify-center pt-4 pb-2 cursor-pointer shrink-0" onClick={() => setIsMapExpanded(!isMapExpanded)}>
             <div className="w-16 h-1.5 bg-gray-800 rounded-full shadow-inner hover:bg-gray-700 transition-colors"></div>

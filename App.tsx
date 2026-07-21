@@ -160,7 +160,9 @@ function App() {
           id: r.id, driverId: r.driver_id, passenger: r.passenger_json, originAddress: r.origin_address,
           destination: r.destination_json, startTime: new Date(r.start_time).getTime(),
           endTime: r.end_time ? new Date(r.end_time).getTime() : undefined,
-          distance: r.distance, fare: r.fare, startLocation: r.start_location_json
+          distance: r.distance, fare: r.fare, startLocation: r.start_location_json,
+          status: r.end_time ? 'completed' : 'pending',
+          paymentMethod: r.passenger_json?.paymentMethod || 'cash'
       })));
     } catch (err) {
       console.error("Erro ao buscar dados do motorista:", err);
@@ -178,13 +180,19 @@ function App() {
             const { data, error } = await supabase.from('passengers').insert([{
                 name: passenger.name, whatsapp: passenger.whatsapp, cpf: passenger.cpf, driver_id: currentDriver.id
             }]).select();
-            if (data && !error) passengerToUse = data[0];
+            if (data && !error) {
+                passengerToUse = data[0];
+                setSavedPassengers(prev => [...prev, passengerToUse]);
+            } else {
+                setSavedPassengers(prev => [...prev, passengerToUse]);
+            }
         }
 
         const rideId = crypto.randomUUID();
         const newRide: Ride = {
             id: rideId, passenger: passengerToUse, destination, startTime: Date.now(),
-            distance: 0, fare, driverId: currentDriver.id, startLocation, originAddress
+            distance: 0, fare, driverId: currentDriver.id, startLocation, originAddress,
+            status: 'pending', paymentMethod: 'cash'
         };
         
         setCurrentRide(newRide);
@@ -213,7 +221,7 @@ function App() {
     if (!currentRide) return;
     try {
         const endTime = Date.now();
-        const updatedRide = { ...currentRide, endTime, distance: finalDistance };
+        const updatedRide: Ride = { ...currentRide, endTime, distance: finalDistance, status: 'completed' };
         setCurrentRide(updatedRide);
         localStorage.setItem(CURRENT_RIDE_STORAGE_KEY, JSON.stringify(updatedRide));
         setRideHistory(prev => prev.map(r => r.id === currentRide.id ? updatedRide : r));

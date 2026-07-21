@@ -15,9 +15,11 @@ L.Icon.Default.mergeOptions({
 });
 
 // Component to handle routing
-const RoutingMachine = ({ start, dest }: { start: [number, number]; dest: [number, number] }) => {
+const RoutingMachine = ({ start, dest, isExpanded }: { start: [number, number]; dest: [number, number], isExpanded: boolean }) => {
     const map = useMap();
     const hasSpoken = useRef(false);
+    const controlRef = useRef<any>(null);
+    const routeBoundsRef = useRef<L.LatLngBounds | null>(null);
 
     useEffect(() => {
         if (!map) return;
@@ -27,10 +29,21 @@ const RoutingMachine = ({ start, dest }: { start: [number, number]; dest: [numbe
             createMarker: () => null, // Hide built-in markers
             addWaypoints: false,
             draggableWaypoints: false,
-            fitSelectedRoutes: false,
+            fitSelectedRoutes: false, // Handle fitting manually
             showAlternatives: false,
             show: false, // Hide instruction panel
         }).addTo(map);
+
+        control.on('routesfound', (e: any) => {
+             const routes = e.routes;
+             if (routes && routes.length > 0) {
+                 const bounds = L.latLngBounds(routes[0].coordinates);
+                 routeBoundsRef.current = bounds;
+                 map.fitBounds(bounds, { padding: [40, 40] });
+             }
+        });
+
+        controlRef.current = control;
 
         // Basic voice guidance triggering
         if (!hasSpoken.current) {
@@ -42,15 +55,35 @@ const RoutingMachine = ({ start, dest }: { start: [number, number]; dest: [numbe
             map.removeControl(control);
         };
     }, [map, start, dest]);
+
+    // Refit bounds when expanded state changes
+    useEffect(() => {
+        if (routeBoundsRef.current && map) {
+            const timers = [
+                setTimeout(() => map.fitBounds(routeBoundsRef.current!, { padding: [40, 40] }), 150),
+                setTimeout(() => map.fitBounds(routeBoundsRef.current!, { padding: [40, 40] }), 400),
+                setTimeout(() => map.fitBounds(routeBoundsRef.current!, { padding: [40, 40] }), 600)
+            ];
+            return () => timers.forEach(clearTimeout);
+        }
+    }, [isExpanded, map]);
+
     return null;
 };
 
 // Component to handle automatic centering
-const MapCenterUpdater = ({ center }: { center: [number, number] }) => {
+// Removed MapCenterUpdater as RoutingMachine now handles fitting
+
+// Component to handle map size changes when container resizes
+const MapSizeUpdater = ({ isExpanded }: { isExpanded: boolean }) => {
     const map = useMap();
     useEffect(() => {
-        map.setView(center, map.getZoom());
-    }, [center, map]);
+        // Trigger resize when animation finishes (or shortly after start)
+        const timer = setTimeout(() => {
+            map.invalidateSize();
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [isExpanded, map]);
     return null;
 };
 
@@ -61,9 +94,10 @@ interface RideMapProps {
     destination: { address: string; city: string };
     destinationCoords: GeolocationCoordinates | null;
     driverName: string;
+    isExpanded: boolean;
 }
 
-const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path, destination, destinationCoords, driverName }) => {
+const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path, destination, destinationCoords, driverName, isExpanded }) => {
     // Center map on origin or current location
     const centerPos: [number, number] = [
         currentLocation?.latitude || startLocation?.latitude || -23.5505,
@@ -85,8 +119,8 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
                 
-                <MapCenterUpdater center={centerPos} />
-                
+                <MapSizeUpdater isExpanded={isExpanded} />
+
                 {startLocation && (
                     <Marker position={startPos}>
                         <Popup>Origem</Popup>
@@ -95,7 +129,7 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
                 
                 {startLocation && destinationCoords && (
                     <>
-                        <RoutingMachine start={startPos} dest={destPos} />
+                        <RoutingMachine start={startPos} dest={destPos} isExpanded={isExpanded} />
                         <Marker position={destPos}>
                             <Popup>Destino</Popup>
                         </Marker>
