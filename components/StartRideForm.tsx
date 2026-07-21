@@ -4,7 +4,6 @@ import type { Passenger, AddressSuggestion, Driver, GeolocationCoordinates, Fare
 import { useDebounce } from '../hooks/useDebounce';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { geocodeAddress, getAddressFromCoordinates } from '../services/geocodingService';
-import { parseRideInfoFromText } from '../services/geminiService';
 import { RideCarLogo, UserIcon, WhatsAppIcon } from './icons';
 import Map from './Map';
 import Footer from './Footer';
@@ -41,172 +40,8 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   };
 
-  const [isRecording, setIsRecording] = useState(false);
-  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
 
-    const recognitionRef = useRef<any>(null);
-    const voiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const accumulatedTextRef = useRef<string>('');
-    const isRecordingRef = useRef(false);
 
-    const [activeVoiceContext, setActiveVoiceContext] = useState<'passenger' | 'route' | null>(null);
-    const activeVoiceContextRef = useRef<'passenger' | 'route' | null>(null);
-
-    const processFinalTranscription = async (text: string, context: 'passenger' | 'route' | 'all') => {
-        const finalQuery = text.trim();
-        
-        if (!finalQuery || finalQuery.length < 3) {
-            setVoiceStatus(null);
-            return;
-        }
-        
-        setVoiceStatus("Extraindo dados...");
-        const parsed = await parseRideInfoFromText(finalQuery, context);
-        
-        if (parsed) {
-            const successMsg = context === 'passenger' ? "Passageiro OK!" : (context === 'route' ? "Rota OK!" : "Viagem OK!");
-            setVoiceStatus(successMsg);
-            
-            const isValid = (val: any) => 
-                val !== null && 
-                val !== undefined && 
-                val !== "null" && 
-                val !== "NULL" && 
-                val !== "" &&
-                String(val).toLowerCase().trim() !== "desconhecido" &&
-                String(val).toLowerCase().trim() !== "não informado" &&
-                String(val).toLowerCase().trim() !== "n/a";
-
-            // Atualização do Nome e WhatsApp
-            if (context === 'passenger' || context === 'all') {
-                if (isValid(parsed.passengerName)) setPassenger(prev => ({ ...prev, name: String(parsed.passengerName) }));
-                
-                if (isValid(parsed.whatsapp)) {
-                    let cleanWa = String(parsed.whatsapp).replace(/\D/g, '');
-                    if (cleanWa.length > 11) {
-                        const possibleMatch = cleanWa.match(/(\d{8,11})$/);
-                        if (possibleMatch) cleanWa = possibleMatch[1];
-                        else cleanWa = cleanWa.substring(0, 11);
-                    }
-                    if (cleanWa.startsWith('55') && cleanWa.length > 11) cleanWa = cleanWa.substring(2);
-                    if (cleanWa.length >= 8 && cleanWa.length <= 11) {
-                        setPassenger(prev => ({ ...prev, whatsapp: cleanWa }));
-                    }
-                }
-            }
-
-            // Atualização do Destino e Cidade
-            if (context === 'route' || context === 'all') {
-                if (isValid(parsed.destinationAddress)) setDestinationAddress(String(parsed.destinationAddress));
-                if (isValid(parsed.destinationNumber)) setDestinationNumber(String(parsed.destinationNumber));
-                if (isValid(parsed.destinationCity)) setDestinationCity(String(parsed.destinationCity));
-                
-                if (isValid(parsed.fare)) {
-                    let cleanFare = String(parsed.fare).replace(/[^\d.,]/g, '').replace(',', '.');
-                    if (cleanFare && !isNaN(parseFloat(cleanFare))) {
-                        setCustomFare(cleanFare);
-                    }
-                }
-            }
-            
-            if (context === 'all') setVoiceStatus("Corrida configurada!");
-            setTimeout(() => setVoiceStatus(null), 3000);
-        } else {
-            setVoiceStatus("Sem dados claros no áudio.");
-            setTimeout(() => setVoiceStatus(null), 3000);
-        }
-        activeVoiceContextRef.current = null;
-        setActiveVoiceContext(null);
-    };
-
-    const handleVoiceRecord = (context: 'passenger' | 'route') => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        
-        if (!SpeechRecognition) {
-            alert("Seu navegador não suporta reconhecimento de voz.");
-            return;
-        }
-
-        if (isRecordingRef.current) {
-            recognitionRef.current?.stop();
-            return;
-        }
-
-        const recognition = new SpeechRecognition();
-        recognitionRef.current = recognition;
-        recognition.lang = 'pt-BR';
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-        recognition.continuous = false; 
-
-        accumulatedTextRef.current = '';
-        activeVoiceContextRef.current = context;
-        setActiveVoiceContext(context);
-        
-        recognition.onstart = () => {
-            isRecordingRef.current = true;
-            setIsRecording(true);
-            setVoiceStatus(context === 'passenger' ? "Diga o Nome e o WhatsApp..." : "Diga o Destino, Cidade e Valor...");
-        };
-
-        recognition.onresult = (event: any) => {
-            let final = '';
-            for (let i = 0; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    final += event.results[i][0].transcript + ' ';
-                }
-            }
-
-            if (final.trim()) {
-                accumulatedTextRef.current = final.trim();
-                setVoiceStatus("Processando: " + accumulatedTextRef.current);
-            } else {
-                let interim = '';
-                for (let i = 0; i < event.results.length; ++i) {
-                    if (!event.results[i].isFinal) {
-                        interim = event.results[i][0].transcript;
-                    }
-                }
-                setVoiceStatus(interim || "Ouvindo...");
-            }
-        };
-
-        recognition.onerror = (event: any) => {
-            console.error("Speech Recognition Error:", event.error);
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            setVoiceStatus(null);
-            activeVoiceContextRef.current = null;
-            setActiveVoiceContext(null);
-        };
-
-        recognition.onend = async () => {
-            const text = accumulatedTextRef.current;
-            const contextToProcess = activeVoiceContextRef.current;
-            
-            console.log("DEBUG onend: text=", text, "context=", contextToProcess);
-
-            if (text && contextToProcess) {
-                await processFinalTranscription(text, contextToProcess);
-            } else {
-                setVoiceStatus(null);
-            }
-            
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            activeVoiceContextRef.current = null;
-            setActiveVoiceContext(null);
-        };
-
-        recognition.start();
-    };
-
-    useEffect(() => {
-        return () => {
-            if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
-            if (recognitionRef.current) recognitionRef.current.stop();
-        };
-    }, []);
 
     useEffect(() => {
         let retryTimer: any;
@@ -347,15 +182,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                     <div className="flex justify-between items-center">
                         <div className="flex flex-col">
                             <p className="text-[12px] text-gray-300 font-black uppercase tracking-widest">Passageiro</p>
-                            <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Diga o Nome e o Celular</p>
                         </div>
-                        <button 
-                            type="button"
-                            onClick={() => handleVoiceRecord('passenger')}
-                            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-[0_0_20px_rgba(234,179,8,0.25)] hover:scale-105 active:scale-95 shrink-0 ${isRecording && activeVoiceContext === 'passenger' ? 'bg-red-500 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.6)]' : 'bg-primary/20 hover:bg-primary border-2 border-primary/50 text-primary hover:text-gray-900'}`}
-                        >
-                            <i className={`fa-solid ${isRecording && activeVoiceContext === 'passenger' ? 'fa-stop text-white' : 'fa-microphone'} text-xl`}></i>
-                        </button>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                         <div className="relative">
@@ -436,17 +263,9 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                                 <div className="w-3.5 h-3.5 bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.6)] mr-3 shrink-0 border-2 border-white rounded-full"></div>
                                 <div className="flex flex-col">
                                     <p className="text-[12px] text-gray-300 font-black uppercase tracking-widest">Destino da Viagem</p>
-                                    <p className="text-[9px] text-gray-500 font-bold uppercase mt-0.5">Diga Cidade e Local</p>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-4 shrink-0">
-                                <button 
-                                    type="button"
-                                    onClick={() => handleVoiceRecord('route')}
-                                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-[0_0_20px_rgba(234,179,8,0.25)] hover:scale-105 active:scale-95 shrink-0 ${isRecording && activeVoiceContext === 'route' ? 'bg-red-500 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.6)]' : 'bg-primary/20 hover:bg-primary border-2 border-primary/50 text-primary hover:text-gray-900'}`}
-                                >
-                                    <i className={`fa-solid ${isRecording && activeVoiceContext === 'route' ? 'fa-stop text-white' : 'fa-microphone'} text-xl`}></i>
-                                </button>
                             </div>
                         </div>
 

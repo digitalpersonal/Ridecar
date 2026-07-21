@@ -64,7 +64,7 @@ export const getCoordinatesForAddress = async (
   try {
     const fullQuery = `${address}, ${city}, Brazil`;
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&limit=1&countrycodes=br`,
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fullQuery)}&limit=1&countrycodes=br&email=digitalpersonal@gmail.com`,
       {
           headers: {
               'Accept': 'application/json',

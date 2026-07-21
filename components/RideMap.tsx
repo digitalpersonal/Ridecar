@@ -76,12 +76,15 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
                 
+                {startLocation && (
+                    <Marker position={startPos}>
+                        <Popup>Origem</Popup>
+                    </Marker>
+                )}
+                
                 {startLocation && destinationCoords && (
                     <>
                         <RoutingMachine start={startPos} dest={destPos} />
-                        <Marker position={startPos}>
-                            <Popup>Origem</Popup>
-                        </Marker>
                         <Marker position={destPos}>
                             <Popup>Destino</Popup>
                         </Marker>
