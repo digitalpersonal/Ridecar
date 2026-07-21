@@ -176,9 +176,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             let interim = '';
             let final = '';
             
-            // Usamos o resultIndex para processar apenas os novos resultados se necessário,
-            // mas como estamos reconstruindo o 'final' a partir do array completo,
-            // garantimos que não haja duplicação limpando a variável 'final' no topo.
             for (let i = 0; i < event.results.length; ++i) {
                 const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
@@ -191,20 +188,17 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             const totalText = (final + interim).trim();
             accumulatedTextRef.current = totalText;
             
-            // Mostramos o que já foi capturado para o usuário ter feedback em tempo real
-            setVoiceStatus("Captado: " + (totalText || "fale..."));
+            // Apenas feedback visual leve
+            setVoiceStatus("Ouvindo...");
 
+            // Reinicia o timer para processar apenas após o silêncio (final da fala)
             if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
             voiceTimeoutRef.current = setTimeout(async () => {
-            if (isRecordingRef.current) {
-                // Processar imediatamente sem esperar o onend
-                const text = accumulatedTextRef.current;
-                isRecordingRef.current = false; // Prevent onend from processing
-                recognition.stop();
-                await processFinalTranscription(text, context);
-            }
-        }, 800); // Reduzido para 800ms para resposta rápida
-
+                if (isRecordingRef.current) {
+                    const text = accumulatedTextRef.current;
+                    recognition.stop(); // O onend processará
+                }
+            }, 1000); // 1s de silêncio para processar
         };
 
         recognition.onerror = (event: any) => {
