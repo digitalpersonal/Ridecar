@@ -183,6 +183,8 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             const text = accumulatedTextRef.current;
             const contextToProcess = activeVoiceContextRef.current;
             
+            console.log("DEBUG onend: text=", text, "context=", contextToProcess);
+
             if (text && contextToProcess) {
                 await processFinalTranscription(text, contextToProcess);
             } else {
