@@ -50,6 +50,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     const isRecordingRef = useRef(false);
 
     const [activeVoiceContext, setActiveVoiceContext] = useState<'passenger' | 'route' | null>(null);
+    const hasProcessedRef = useRef(false);
 
     const processFinalTranscription = async (text: string, context: 'passenger' | 'route' | 'all') => {
         const finalQuery = text.trim();
@@ -125,9 +126,23 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             return;
         }
 
-        // If already recording, stop and process
+        // If already recording, stop and process immediately
         if (isRecordingRef.current) {
-            recognitionRef.current?.stop();
+            hasProcessedRef.current = false; // Reset
+            const text = accumulatedTextRef.current;
+            const currentContext = activeVoiceContext;
+            
+            // Immediate UI update
+            setIsRecording(false);
+            setVoiceStatus("Processando...");
+            
+            recognitionRef.current?.stop(); // This triggers onend later
+            
+            // Immediate processing
+            if (currentContext && text) {
+                hasProcessedRef.current = true; // Atomically mark as processed
+                processFinalTranscription(text, currentContext);
+            }
             return;
         }
 
@@ -173,17 +188,18 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
         };
 
         recognition.onend = async () => {
-            const text = accumulatedTextRef.current;
-            const contextToProcess = activeVoiceContext;
+            if (!hasProcessedRef.current && accumulatedTextRef.current && activeVoiceContext) {
+                const text = accumulatedTextRef.current;
+                const contextToProcess = activeVoiceContext;
+                setVoiceStatus("Processando...");
+                await processFinalTranscription(text, contextToProcess);
+            }
             
+            // Clean up
             isRecordingRef.current = false;
             setIsRecording(false);
             setActiveVoiceContext(null);
-            
-            if (text && contextToProcess) {
-                setVoiceStatus("Processando...");
-                await processFinalTranscription(text, contextToProcess);
-            } else {
+            if (!hasProcessedRef.current) {
                 setVoiceStatus(null);
             }
         };
