@@ -150,21 +150,25 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
         };
 
         recognition.onresult = (event: any) => {
-            let interim = '';
             let final = '';
-            
             for (let i = 0; i < event.results.length; ++i) {
-                const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
-                    final += transcript + ' ';
-                } else {
-                    interim = transcript;
+                    final += event.results[i][0].transcript + ' ';
                 }
             }
 
-            const totalText = (final + interim).trim();
-            accumulatedTextRef.current = totalText;
-            setVoiceStatus(totalText || "Ouvindo...");
+            if (final.trim()) {
+                accumulatedTextRef.current = final.trim();
+                setVoiceStatus("Processando: " + accumulatedTextRef.current);
+            } else {
+                let interim = '';
+                for (let i = 0; i < event.results.length; ++i) {
+                    if (!event.results[i].isFinal) {
+                        interim = event.results[i][0].transcript;
+                    }
+                }
+                setVoiceStatus(interim || "Ouvindo...");
+            }
         };
 
         recognition.onerror = (event: any) => {
@@ -177,9 +181,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
         };
 
         recognition.onend = async () => {
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            
             const text = accumulatedTextRef.current;
             const contextToProcess = activeVoiceContextRef.current;
             
@@ -190,6 +191,11 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             } else {
                 setVoiceStatus(null);
             }
+            
+            isRecordingRef.current = false;
+            setIsRecording(false);
+            activeVoiceContextRef.current = null;
+            setActiveVoiceContext(null);
         };
 
         recognition.start();
