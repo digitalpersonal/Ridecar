@@ -51,29 +51,83 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
     const [activeVoiceContext, setActiveVoiceContext] = useState<'passenger' | 'route' | null>(null);
 
+    const processFinalTranscription = async (text: string, context: 'passenger' | 'route' | 'all') => {
+        const finalQuery = text.trim();
+        
+        if (!finalQuery || finalQuery.length < 3) {
+            setVoiceStatus(null);
+            return;
+        }
+        
+        setVoiceStatus("Extraindo dados...");
+        const parsed = await parseRideInfoFromText(finalQuery, context);
+        
+        if (parsed) {
+            const successMsg = context === 'passenger' ? "Passageiro OK!" : (context === 'route' ? "Rota OK!" : "Viagem OK!");
+            setVoiceStatus(successMsg);
+            
+            const isValid = (val: any) => 
+                val !== null && 
+                val !== undefined && 
+                val !== "null" && 
+                val !== "NULL" && 
+                val !== "" &&
+                String(val).toLowerCase().trim() !== "desconhecido" &&
+                String(val).toLowerCase().trim() !== "não informado" &&
+                String(val).toLowerCase().trim() !== "n/a";
+
+            // Atualização do Nome e WhatsApp
+            if (context === 'passenger' || context === 'all') {
+                if (isValid(parsed.passengerName)) setPassenger(prev => ({ ...prev, name: String(parsed.passengerName) }));
+                
+                if (isValid(parsed.whatsapp)) {
+                    let cleanWa = String(parsed.whatsapp).replace(/\D/g, '');
+                    if (cleanWa.length > 11) {
+                        const possibleMatch = cleanWa.match(/(\d{8,11})$/);
+                        if (possibleMatch) cleanWa = possibleMatch[1];
+                        else cleanWa = cleanWa.substring(0, 11);
+                    }
+                    if (cleanWa.startsWith('55') && cleanWa.length > 11) cleanWa = cleanWa.substring(2);
+                    if (cleanWa.length >= 8 && cleanWa.length <= 11) {
+                        setPassenger(prev => ({ ...prev, whatsapp: cleanWa }));
+                    }
+                }
+            }
+
+            // Atualização do Destino e Cidade
+            if (context === 'route' || context === 'all') {
+                if (isValid(parsed.destinationAddress)) setDestinationAddress(String(parsed.destinationAddress));
+                if (isValid(parsed.destinationNumber)) setDestinationNumber(String(parsed.destinationNumber));
+                if (isValid(parsed.destinationCity)) setDestinationCity(String(parsed.destinationCity));
+                
+                if (isValid(parsed.fare)) {
+                    let cleanFare = String(parsed.fare).replace(/[^\d.,]/g, '').replace(',', '.');
+                    if (cleanFare && !isNaN(parseFloat(cleanFare))) {
+                        setCustomFare(cleanFare);
+                    }
+                }
+            }
+            
+            if (context === 'all') setVoiceStatus("Corrida configurada!");
+            setTimeout(() => setVoiceStatus(null), 3000);
+        } else {
+            setVoiceStatus("Sem dados claros no áudio.");
+            setTimeout(() => setVoiceStatus(null), 3000);
+        }
+        setActiveVoiceContext(null);
+    };
+
     const handleVoiceRecord = (context: 'passenger' | 'route') => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         
-        console.log("BRAIN: Inicializando reconhecimento de voz...", { supported: !!SpeechRecognition });
-
         if (!SpeechRecognition) {
-            alert("Seu navegador não suporta reconhecimento de voz (SpeechRecognition). No iPhone, use o Safari.");
+            alert("Seu navegador não suporta reconhecimento de voz.");
             return;
         }
 
+        // If already recording, stop and process
         if (isRecordingRef.current) {
-            // Immediate UI update
-            setIsRecording(false);
-            if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
-            const text = accumulatedTextRef.current;
-            const currentContext = activeVoiceContext;
-            isRecordingRef.current = false;
             recognitionRef.current?.stop();
-            
-            setVoiceStatus("Processando...");
-            if (currentContext) {
-                processFinalTranscription(text, currentContext);
-            }
             return;
         }
 
@@ -85,99 +139,12 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
         recognition.continuous = true; 
 
         accumulatedTextRef.current = '';
-
+        setActiveVoiceContext(context);
+        
         recognition.onstart = () => {
             isRecordingRef.current = true;
-            setIsRecording(true); // Ensured this is set here
-            setActiveVoiceContext(context);
+            setIsRecording(true);
             setVoiceStatus(context === 'passenger' ? "Diga o Nome e o WhatsApp..." : "Diga o Destino, Cidade e Valor...");
-        };
-
-        const processFinalTranscription = async (text: string, context: 'passenger' | 'route' | 'all') => {
-            const finalQuery = text.trim();
-            console.log(`BRAIN: Analisando transcrição [${context}]:`, finalQuery);
-            
-            if (!finalQuery || finalQuery.length < 3) {
-                setVoiceStatus(null);
-                isRecordingRef.current = false;
-                setIsRecording(false);
-                setActiveVoiceContext(null);
-                return;
-            }
-            
-            setVoiceStatus("Extraindo dados...");
-            const parsed = await parseRideInfoFromText(finalQuery, context);
-            
-            if (parsed) {
-                console.log("BRAIN: Dados extraídos:", parsed);
-                // Armazenamos o texto final para debug/feedback se necessário
-                const successMsg = context === 'passenger' ? "Passageiro OK!" : (context === 'route' ? "Rota OK!" : "Viagem OK!");
-                setVoiceStatus(successMsg);
-                
-                const isValid = (val: any) => 
-                    val !== null && 
-                    val !== undefined && 
-                    val !== "null" && 
-                    val !== "NULL" && 
-                    val !== "" &&
-                    String(val).toLowerCase().trim() !== "desconhecido" &&
-                    String(val).toLowerCase().trim() !== "não informado" &&
-                    String(val).toLowerCase().trim() !== "n/a";
-
-                // Atualização do Nome e WhatsApp (Contexto Passageiro ou Geral)
-                if (context === 'passenger' || context === 'all') {
-                    if (isValid(parsed.passengerName)) setPassenger(prev => ({ ...prev, name: String(parsed.passengerName) }));
-                    
-                    if (isValid(parsed.whatsapp)) {
-                        let cleanWa = String(parsed.whatsapp).replace(/\D/g, '');
-                        if (cleanWa.length > 11) {
-                            const possibleMatch = cleanWa.match(/(\d{8,11})$/);
-                            if (possibleMatch) cleanWa = possibleMatch[1];
-                            else cleanWa = cleanWa.substring(0, 11);
-                        }
-                        if (cleanWa.startsWith('55') && cleanWa.length > 11) cleanWa = cleanWa.substring(2);
-                        if (cleanWa.length >= 8 && cleanWa.length <= 11) {
-                            setPassenger(prev => ({ ...prev, whatsapp: cleanWa }));
-                        }
-                    }
-                    if (context === 'passenger') {
-                         setVoiceStatus("Passageiro: " + (parsed.passengerName || "Identificado"));
-                    }
-                }
-
-                // Atualização do Destino e Cidade (Contexto Rota ou Geral)
-                if (context === 'route' || context === 'all') {
-                    const hasAddress = isValid(parsed.destinationAddress);
-                    const hasCity = isValid(parsed.destinationCity);
-                    const hasFare = isValid(parsed.fare);
-
-                    if (hasAddress) setDestinationAddress(String(parsed.destinationAddress));
-                    if (isValid(parsed.destinationNumber)) setDestinationNumber(String(parsed.destinationNumber));
-
-                    if (hasCity) {
-                        setDestinationCity(String(parsed.destinationCity));
-                    }
-                    
-                    if (hasFare) {
-                        let cleanFare = String(parsed.fare).replace(/[^\d.,]/g, '').replace(',', '.');
-                        if (cleanFare && !isNaN(parseFloat(cleanFare))) {
-                            setCustomFare(cleanFare);
-                        }
-                    }
-                    if (context === 'route') {
-                        setVoiceStatus("Destino: " + (parsed.destinationAddress || "Capturado"));
-                    }
-                }
-                
-                if (context === 'all') setVoiceStatus("Corrida configurada!");
-                setTimeout(() => setVoiceStatus(null), 5000);
-            } else {
-                setVoiceStatus("Sem dados claros no áudio.");
-                setTimeout(() => setVoiceStatus(null), 5000);
-            }
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            setActiveVoiceContext(null);
         };
 
         recognition.onresult = (event: any) => {
@@ -195,41 +162,29 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
             const totalText = (final + interim).trim();
             accumulatedTextRef.current = totalText;
-            
-            // Exibimos a transcrição em tempo real para o usuário
             setVoiceStatus(totalText || "Ouvindo...");
-
-            // Reinicia o timer para processar apenas após o silêncio (final da fala)
-            if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
-            voiceTimeoutRef.current = setTimeout(async () => {
-                if (isRecordingRef.current) {
-                    const text = accumulatedTextRef.current;
-                    recognition.stop(); // O onend processará
-                }
-            }, 600); // Reduzido para 600ms para processar mais rápido após silêncio
         };
 
         recognition.onerror = (event: any) => {
             console.error("Speech Recognition Error:", event.error);
-            const errorMsg = event.error === 'not-allowed' ? "Microfone bloqueado pelo navegador. Verifique as permissões de HTTPS." :
-                            event.error === 'service-not-allowed' ? "Serviço de voz não disponível." :
-                            event.error === 'network' ? "Erro de conexão/internet." : event.error;
-            
-            if (event.error !== 'no-speech') {
-                setVoiceStatus("Erro: " + errorMsg);
-                alert("Erro no Microfone: " + errorMsg + "\nCertifique-se que o site usa HTTPS e o acesso ao microfone foi permitido.");
-                setTimeout(() => setVoiceStatus(null), 5000);
-            }
             isRecordingRef.current = false;
             setIsRecording(false);
-            if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
+            setVoiceStatus(null);
         };
 
-        recognition.onend = () => {
-            if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
-            // Agora usamos a Ref para saber se devemos processar, evitando problemas de closure
-            if (isRecordingRef.current) {
-                processFinalTranscription(accumulatedTextRef.current, context);
+        recognition.onend = async () => {
+            const text = accumulatedTextRef.current;
+            const contextToProcess = activeVoiceContext;
+            
+            isRecordingRef.current = false;
+            setIsRecording(false);
+            setActiveVoiceContext(null);
+            
+            if (text && contextToProcess) {
+                setVoiceStatus("Processando...");
+                await processFinalTranscription(text, contextToProcess);
+            } else {
+                setVoiceStatus(null);
             }
         };
 
