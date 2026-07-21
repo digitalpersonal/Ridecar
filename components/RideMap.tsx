@@ -23,12 +23,13 @@ const RoutingMachine = ({ start, dest }: { start: [number, number]; dest: [numbe
         if (!map) return;
         const control = L.Routing.control({
             waypoints: [L.latLng(start[0], start[1]), L.latLng(dest[0], dest[1])],
-            lineOptions: { styles: [{ color: '#6366f1', weight: 4 }] },
+            lineOptions: { styles: [{ color: '#3b82f6', weight: 6, opacity: 0.8 }] },
+            createMarker: () => null, // Hide built-in markers
             addWaypoints: false,
             draggableWaypoints: false,
             fitSelectedRoutes: true,
             showAlternatives: false,
-            show: false, // Hide instruction panel to avoid visual glitches
+            show: false, // Hide instruction panel
         }).addTo(map);
 
         // Basic voice guidance triggering
@@ -69,6 +70,11 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
 
     return (
         <div className="h-full w-full">
+            <style>
+                {`
+                    .leaflet-routing-container { display: none !important; }
+                `}
+            </style>
             <MapContainer center={centerPos} zoom={14} style={{ height: '100%', width: '100%' }}>
                 <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -76,7 +82,15 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
                 />
                 
                 {startLocation && destinationCoords && (
-                    <RoutingMachine start={startPos} dest={destPos} />
+                    <>
+                        <RoutingMachine start={startPos} dest={destPos} />
+                        <Marker position={startPos}>
+                            <Popup>Origem</Popup>
+                        </Marker>
+                        <Marker position={destPos}>
+                            <Popup>Destino</Popup>
+                        </Marker>
+                    </>
                 )}
                 
                 {currentLocation && (
