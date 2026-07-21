@@ -62,10 +62,11 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
         }
 
         if (isRecordingRef.current) {
-            if (activeVoiceContext !== context) return; // Prevent clicking one while other is recording
+            // Immediate UI update
+            setIsRecording(false);
             if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
             recognitionRef.current?.stop();
-            setVoiceStatus("Processando áudio...");
+            setVoiceStatus("Processando...");
             return;
         }
 
@@ -80,7 +81,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
         recognition.onstart = () => {
             isRecordingRef.current = true;
-            setIsRecording(true);
+            setIsRecording(true); // Ensured this is set here
             setActiveVoiceContext(context);
             setVoiceStatus(context === 'passenger' ? "Diga o Nome e o WhatsApp..." : "Diga o Destino, Cidade e Valor...");
         };
@@ -188,8 +189,8 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             const totalText = (final + interim).trim();
             accumulatedTextRef.current = totalText;
             
-            // Apenas feedback visual leve
-            setVoiceStatus("Ouvindo...");
+            // Exibimos a transcrição em tempo real para o usuário
+            setVoiceStatus(totalText || "Ouvindo...");
 
             // Reinicia o timer para processar apenas após o silêncio (final da fala)
             if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
@@ -198,7 +199,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                     const text = accumulatedTextRef.current;
                     recognition.stop(); // O onend processará
                 }
-            }, 1000); // 1s de silêncio para processar
+            }, 600); // Reduzido para 600ms para processar mais rápido após silêncio
         };
 
         recognition.onerror = (event: any) => {
