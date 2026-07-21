@@ -195,11 +195,16 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             setVoiceStatus("Captado: " + (totalText || "fale..."));
 
             if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
-            voiceTimeoutRef.current = setTimeout(() => {
-                if (isRecordingRef.current) {
-                    recognition.stop();
-                }
-            }, 1500); // Reduzido para 1.5s para maior agilidade
+            voiceTimeoutRef.current = setTimeout(async () => {
+            if (isRecordingRef.current) {
+                // Processar imediatamente sem esperar o onend
+                const text = accumulatedTextRef.current;
+                isRecordingRef.current = false; // Prevent onend from processing
+                recognition.stop();
+                await processFinalTranscription(text, context);
+            }
+        }, 800); // Reduzido para 800ms para resposta rápida
+
         };
 
         recognition.onerror = (event: any) => {
