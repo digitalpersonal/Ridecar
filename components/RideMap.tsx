@@ -27,7 +27,7 @@ const RoutingMachine = ({ start, dest }: { start: [number, number]; dest: [numbe
             createMarker: () => null, // Hide built-in markers
             addWaypoints: false,
             draggableWaypoints: false,
-            fitSelectedRoutes: true,
+            fitSelectedRoutes: false,
             showAlternatives: false,
             show: false, // Hide instruction panel
         }).addTo(map);
@@ -42,6 +42,15 @@ const RoutingMachine = ({ start, dest }: { start: [number, number]; dest: [numbe
             map.removeControl(control);
         };
     }, [map, start, dest]);
+    return null;
+};
+
+// Component to handle automatic centering
+const MapCenterUpdater = ({ center }: { center: [number, number] }) => {
+    const map = useMap();
+    useEffect(() => {
+        map.setView(center, map.getZoom());
+    }, [center, map]);
     return null;
 };
 
@@ -75,6 +84,8 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
+                
+                <MapCenterUpdater center={centerPos} />
                 
                 {startLocation && (
                     <Marker position={startPos}>
