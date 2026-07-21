@@ -104,12 +104,14 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
         currentLocation?.longitude || startLocation?.longitude || -46.6333
     ];
     
-    const startPos: [number, number] = [
+    const startPos: [number, number] = React.useMemo(() => [
         startLocation?.latitude || -23.5505,
         startLocation?.longitude || -46.6333
-    ];
+    ], [startLocation?.latitude, startLocation?.longitude]);
     
-    const destPos: [number, number] = destinationCoords ? [destinationCoords.latitude, destinationCoords.longitude] : startPos;
+    const destPos: [number, number] = React.useMemo(() => (
+        destinationCoords ? [destinationCoords.latitude, destinationCoords.longitude] : startPos
+    ), [destinationCoords?.latitude, destinationCoords?.longitude, startPos]);
 
     return (
         <div className="h-full w-full">

@@ -82,6 +82,24 @@ export const getCoordinatesForAddress = async (
       };
       cache[cacheKey] = res;
       return res;
+    } else {
+        // Fallback to just the city if exact address is not found
+        const fallbackQuery = `${city}, Brazil`;
+        const fallbackResponse = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(fallbackQuery)}&limit=1&countrycodes=br&email=digitalpersonal@gmail.com`,
+            { headers: { 'Accept': 'application/json' } }
+        );
+        if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            if (fallbackData && fallbackData.length > 0) {
+                const res = {
+                    latitude: parseFloat(fallbackData[0].lat),
+                    longitude: parseFloat(fallbackData[0].lon),
+                };
+                cache[cacheKey] = res;
+                return res;
+            }
+        }
     }
     return null;
   } catch (error) {

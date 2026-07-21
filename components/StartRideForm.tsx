@@ -137,11 +137,17 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                     <button onClick={() => setIsMenuOpen(false)} className="w-full text-left px-5 py-4 rounded-2xl bg-primary text-white font-bold flex items-center shadow-lg shadow-primary/20">
                         <i className="fa-solid fa-car-side w-8 text-xl"></i> Nova Corrida
                     </button>
+                    <button onClick={() => onNavigateToAdmin('dashboard')} className="w-full text-left px-5 py-4 rounded-2xl hover:bg-gray-800 text-gray-300 transition-colors flex items-center">
+                        <i className="fa-solid fa-chart-pie w-8 text-xl"></i> Resumo Geral
+                    </button>
                     <button onClick={() => onNavigateToAdmin('history')} className="w-full text-left px-5 py-4 rounded-2xl hover:bg-gray-800 text-gray-300 transition-colors flex items-center">
                         <i className="fa-solid fa-clock-rotate-left w-8 text-xl"></i> Histórico
                     </button>
                     <button onClick={() => onNavigateToAdmin('financials')} className="w-full text-left px-5 py-4 rounded-2xl hover:bg-gray-800 text-gray-300 transition-colors flex items-center">
                         <i className="fa-solid fa-wallet w-8 text-xl"></i> Financeiro
+                    </button>
+                    <button onClick={() => onNavigateToAdmin('passengers')} className="w-full text-left px-5 py-4 rounded-2xl hover:bg-gray-800 text-gray-300 transition-colors flex items-center">
+                        <i className="fa-solid fa-users w-8 text-xl"></i> Meus Clientes
                     </button>
                 </nav>
             </div>
