@@ -70,11 +70,6 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
 
     return (
         <div className="h-full w-full">
-            <style>
-                {`
-                    .leaflet-routing-container { display: none !important; }
-                `}
-            </style>
             <MapContainer center={centerPos} zoom={14} style={{ height: '100%', width: '100%' }}>
                 <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
