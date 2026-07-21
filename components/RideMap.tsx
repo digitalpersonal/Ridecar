@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import { Ride, GeolocationCoordinates } from '../types';
 
 // Fix for default leaflet marker icons
@@ -16,6 +17,8 @@ L.Icon.Default.mergeOptions({
 // Component to handle routing
 const RoutingMachine = ({ start, dest }: { start: [number, number]; dest: [number, number] }) => {
     const map = useMap();
+    const hasSpoken = useRef(false);
+
     useEffect(() => {
         if (!map) return;
         const control = L.Routing.control({
@@ -25,10 +28,14 @@ const RoutingMachine = ({ start, dest }: { start: [number, number]; dest: [numbe
             draggableWaypoints: false,
             fitSelectedRoutes: true,
             showAlternatives: false,
+            show: false, // Hide instruction panel to avoid visual glitches
         }).addTo(map);
 
         // Basic voice guidance triggering
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance('Iniciando navegação para o destino.'));
+        if (!hasSpoken.current) {
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance('Iniciando navegação para o destino.'));
+            hasSpoken.current = true;
+        }
 
         return () => {
             map.removeControl(control);

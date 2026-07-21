@@ -199,7 +199,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                 if (isRecordingRef.current) {
                     recognition.stop();
                 }
-            }, 4000); // Aumentado para 4s para dar mais tempo ao usuário finalizar
+            }, 1500); // Reduzido para 1.5s para maior agilidade
         };
 
         recognition.onerror = (event: any) => {
