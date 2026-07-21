@@ -56,3 +56,12 @@ BEGIN
     EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'column destination_json already exists';
     END;
 END $$;
+
+-- 3. Atualizando a tabela de PASSAGEIROS (Passengers) para vincular ao Motorista
+DO $$ 
+BEGIN 
+    BEGIN
+        ALTER TABLE passengers ADD COLUMN driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE;
+    EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'column driver_id already exists';
+    END;
+END $$;

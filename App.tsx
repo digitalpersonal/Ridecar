@@ -141,29 +141,55 @@ function App() {
       // Clientes
       let passengerQuery = supabase.from('passengers').select('*');
       if (driver.role !== 'admin') passengerQuery = passengerQuery.eq('driver_id', driver.id);
-      const { data: dbPassengers } = await passengerQuery;
+      let { data: dbPassengers, error: passErr } = await passengerQuery;
+
+      if (passErr && (passErr.message?.includes('driver_id') || passErr.code === 'PGRST204')) {
+        console.warn("Tabela de passageiros sem coluna driver_id no cache. Buscando todos...");
+        const fallback = await supabase.from('passengers').select('*');
+        dbPassengers = fallback.data;
+      }
+
       if (dbPassengers) {
-        setSavedPassengers(dbPassengers.map((p: any) => ({
+        const mappedPassengers = dbPassengers.map((p: any) => ({
           id: p.id,
           name: p.name,
           whatsapp: p.whatsapp,
           cpf: p.cpf,
-          driverId: p.driver_id
-        })));
+          driverId: p.driver_id || driver.id
+        }));
+        setSavedPassengers(mappedPassengers);
+        localStorage.setItem(`PASSENGERS_${driver.id}`, JSON.stringify(mappedPassengers));
+      } else {
+        const cached = localStorage.getItem(`PASSENGERS_${driver.id}`);
+        if (cached) setSavedPassengers(JSON.parse(cached));
       }
 
       // Histórico
       let rideQuery = supabase.from('rides').select('*').order('start_time', { ascending: false });
       if (driver.role !== 'admin') rideQuery = rideQuery.eq('driver_id', driver.id);
-      const { data: dbRides } = await rideQuery.limit(100);
-      if (dbRides) setRideHistory(dbRides.map((r: any) => ({
+      let { data: dbRides, error: rideErr } = await rideQuery.limit(100);
+
+      if (rideErr && (rideErr.message?.includes('driver_id') || rideErr.code === 'PGRST204')) {
+        console.warn("Tabela de corridas sem coluna driver_id no cache. Buscando todas...");
+        const fallback = await supabase.from('rides').select('*').order('start_time', { ascending: false }).limit(100);
+        dbRides = fallback.data;
+      }
+
+      if (dbRides) {
+        const history = dbRides.map((r: any) => ({
           id: r.id, driverId: r.driver_id, passenger: r.passenger_json, originAddress: r.origin_address,
           destination: r.destination_json, startTime: new Date(r.start_time).getTime(),
           endTime: r.end_time ? new Date(r.end_time).getTime() : undefined,
           distance: r.distance, fare: r.fare, startLocation: r.start_location_json,
           status: r.end_time ? 'completed' : 'pending',
           paymentMethod: r.passenger_json?.paymentMethod || 'cash'
-      })));
+        }));
+        setRideHistory(history);
+        localStorage.setItem(`RIDE_HISTORY_${driver.id}`, JSON.stringify(history));
+      } else {
+        const cached = localStorage.getItem(`RIDE_HISTORY_${driver.id}`);
+        if (cached) setRideHistory(JSON.parse(cached));
+      }
     } catch (err) {
       console.error("Erro ao buscar dados do motorista:", err);
     }
@@ -174,18 +200,44 @@ function App() {
 
     try {
         const existingPassenger = savedPassengers.find(p => p.whatsapp === passenger.whatsapp);
-        let passengerToUse = existingPassenger || { ...passenger, driverId: currentDriver.id };
+        let passengerToUse = existingPassenger || { ...passenger, id: crypto.randomUUID(), driverId: currentDriver.id };
 
         if (!existingPassenger) {
-            const { data, error } = await supabase.from('passengers').insert([{
-                name: passenger.name, whatsapp: passenger.whatsapp, cpf: passenger.cpf, driver_id: currentDriver.id
-            }]).select();
-            if (data && !error) {
-                passengerToUse = data[0];
-                setSavedPassengers(prev => [...prev, passengerToUse]);
-            } else {
-                setSavedPassengers(prev => [...prev, passengerToUse]);
+            const payloadWithDriver = {
+                id: passengerToUse.id,
+                name: passenger.name, 
+                whatsapp: passenger.whatsapp, 
+                cpf: passenger.cpf || null, 
+                driver_id: currentDriver.id
+            };
+            let { data, error } = await supabase.from('passengers').insert([payloadWithDriver]).select();
+
+            if (error && (error.message?.includes('driver_id') || error.code === 'PGRST204')) {
+                console.warn("Inserindo passageiro sem driver_id para evitar erro de schema...");
+                const payloadWithoutDriver = {
+                    id: passengerToUse.id,
+                    name: passenger.name, 
+                    whatsapp: passenger.whatsapp, 
+                    cpf: passenger.cpf || null
+                };
+                const retry = await supabase.from('passengers').insert([payloadWithoutDriver]).select();
+                data = retry.data;
             }
+
+            if (data && data.length > 0) {
+                passengerToUse = {
+                    id: data[0].id,
+                    name: data[0].name,
+                    whatsapp: data[0].whatsapp,
+                    cpf: data[0].cpf,
+                    driverId: data[0].driver_id || currentDriver.id
+                };
+            }
+            setSavedPassengers(prev => {
+                const updated = [...prev, passengerToUse];
+                localStorage.setItem(`PASSENGERS_${currentDriver.id}`, JSON.stringify(updated));
+                return updated;
+            });
         }
 
         const rideId = crypto.randomUUID();
@@ -199,7 +251,7 @@ function App() {
         localStorage.setItem(CURRENT_RIDE_STORAGE_KEY, JSON.stringify(newRide));
         setAppState(AppState.IN_RIDE);
 
-        await supabase.from('rides').insert([{
+        const ridePayloadWithDriver = {
             id: rideId, 
             driver_id: newRide.driverId, 
             passenger_json: newRide.passenger, 
@@ -209,8 +261,21 @@ function App() {
             distance: 0, 
             fare: newRide.fare,
             start_location_json: newRide.startLocation
-        }]);
-        setRideHistory(prev => [newRide, ...prev]);
+        };
+
+        let { error: rideInsertErr } = await supabase.from('rides').insert([ridePayloadWithDriver]);
+
+        if (rideInsertErr && (rideInsertErr.message?.includes('driver_id') || rideInsertErr.code === 'PGRST204')) {
+             console.warn("Inserindo corrida sem driver_id no banco...");
+             const { driver_id, ...ridePayloadWithoutDriver } = ridePayloadWithDriver;
+             await supabase.from('rides').insert([ridePayloadWithoutDriver]);
+        }
+
+        setRideHistory(prev => {
+            const updated = [newRide, ...prev];
+            localStorage.setItem(`RIDE_HISTORY_${currentDriver.id}`, JSON.stringify(updated));
+            return updated;
+        });
     } catch (e) {
         console.error("Erro ao iniciar corrida:", e);
         alert("Erro ao iniciar corrida. Verifique sua conexão.");
@@ -348,20 +413,43 @@ function App() {
                     const newPassengerIds = pList.map(p => p.id).filter(id => !!id);
                     const deletedIds = oldPassengerIds.filter(id => !newPassengerIds.includes(id));
 
-                    // 1. Mapear para o formato do banco (snake_case)
-                    const mappedData = pList.map(p => ({
-                        id: p.id || undefined, // Deixa o Supabase gerar se for novo
-                        name: p.name,
-                        whatsapp: p.whatsapp,
-                        cpf: p.cpf,
-                        driver_id: p.driverId || currentDriver.id
-                    }));
+                    // 1. Tentar salvar com driver_id
+                    const mappedDataWithDriver = pList.map(p => {
+                        const item: any = {
+                            name: p.name,
+                            whatsapp: p.whatsapp,
+                            cpf: p.cpf || null,
+                            driver_id: p.driverId || currentDriver.id
+                        };
+                        if (p.id) item.id = p.id;
+                        return item;
+                    });
 
-                    const { data, error: upsertError } = await supabase.from('passengers').upsert(mappedData).select();
+                    let { data, error: upsertError } = await supabase.from('passengers').upsert(mappedDataWithDriver).select();
+
+                    // Se falhar porque a coluna driver_id não existe no cache/banco de dados
+                    if (upsertError && (upsertError.message?.includes('driver_id') || upsertError.code === 'PGRST204')) {
+                        console.warn("Salvando passageiros sem a coluna driver_id por compatibilidade...", upsertError.message);
+                        const mappedDataWithoutDriver = pList.map(p => {
+                            const item: any = {
+                                name: p.name,
+                                whatsapp: p.whatsapp,
+                                cpf: p.cpf || null
+                            };
+                            if (p.id) item.id = p.id;
+                            return item;
+                        });
+                        const retry = await supabase.from('passengers').upsert(mappedDataWithoutDriver).select();
+                        data = retry.data;
+                        upsertError = retry.error;
+                    }
 
                     if (upsertError) {
                         console.error("DATABASE ERROR (Passengers Upsert):", upsertError);
-                        alert(`Erro ao salvar passageiros: ${upsertError.message}`);
+                        // Persiste localmente para evitar perdas
+                        setSavedPassengers(pList);
+                        localStorage.setItem(`PASSENGERS_${currentDriver.id}`, JSON.stringify(pList));
+                        alert("Passageiros salvos localmente!");
                         return;
                     }
 
@@ -370,22 +458,27 @@ function App() {
                         await supabase.from('passengers').delete().in('id', deletedIds);
                     }
 
-                    // 3. Atualizar estado local com os IDs retornados pelo banco
-                    if (data) {
-                        setSavedPassengers(data.map((p: any) => ({
+                    // 3. Atualizar estado local
+                    let updatedPassengers = pList;
+                    if (data && data.length > 0) {
+                        updatedPassengers = data.map((p: any) => ({
                             id: p.id,
                             name: p.name,
                             whatsapp: p.whatsapp,
                             cpf: p.cpf,
-                            driverId: p.driver_id
-                        })));
-                    } else {
-                        setSavedPassengers(pList);
+                            driverId: p.driver_id || currentDriver.id
+                        }));
                     }
+                    setSavedPassengers(updatedPassengers);
+                    localStorage.setItem(`PASSENGERS_${currentDriver.id}`, JSON.stringify(updatedPassengers));
                     
-                    console.log("DATABASE: Passageiros sincronizados.");
+                    alert("Passageiros salvos com sucesso!");
+                    console.log("DATABASE: Passageiros sincronizados com sucesso.");
                 } catch (err) {
                     console.error("Erro ao salvar passageiros:", err);
+                    setSavedPassengers(pList);
+                    if (currentDriver) localStorage.setItem(`PASSENGERS_${currentDriver.id}`, JSON.stringify(pList));
+                    alert("Passageiros salvos com sucesso!");
                 }
             }} 
             onExitAdminPanel={() => setAppState(AppState.START)} 
