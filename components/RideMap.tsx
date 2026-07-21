@@ -14,6 +14,51 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+// Component to handle dynamic bounds fitting and zoom adjustment between points
+const FitBoundsUpdater = ({ 
+    startPos, 
+    destPos, 
+    currentPos, 
+    isExpanded 
+}: { 
+    startPos: [number, number]; 
+    destPos?: [number, number] | null; 
+    currentPos?: [number, number] | null; 
+    isExpanded: boolean;
+}) => {
+    const map = useMap();
+
+    useEffect(() => {
+        if (!map) return;
+
+        // Ensure map container dimensions are updated before calculating bounds
+        map.invalidateSize();
+
+        const points: [number, number][] = [startPos];
+        if (destPos && (destPos[0] !== startPos[0] || destPos[1] !== startPos[1])) {
+            points.push(destPos);
+        }
+        if (currentPos) {
+            points.push(currentPos);
+        }
+
+        if (points.length === 1) {
+            map.setView(points[0], 14, { animate: true });
+        } else if (points.length > 1) {
+            const bounds = L.latLngBounds(points.map(p => L.latLng(p[0], p[1])));
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, {
+                    padding: [50, 50],
+                    maxZoom: 15,
+                    animate: true
+                });
+            }
+        }
+    }, [map, startPos[0], startPos[1], destPos?.[0], destPos?.[1], currentPos?.[0], currentPos?.[1], isExpanded]);
+
+    return null;
+};
+
 // Component to handle routing
 const RoutingMachine = ({ start, dest, isExpanded }: { start: [number, number]; dest: [number, number], isExpanded: boolean }) => {
     const map = useMap();
@@ -29,7 +74,7 @@ const RoutingMachine = ({ start, dest, isExpanded }: { start: [number, number]; 
             createMarker: () => null, // Hide built-in markers
             addWaypoints: false,
             draggableWaypoints: false,
-            fitSelectedRoutes: false, // Handle fitting manually
+            fitSelectedRoutes: false, // Handle fitting manually via fitBounds
             showAlternatives: false,
             show: false, // Hide instruction panel
         }).addTo(map);
@@ -39,7 +84,7 @@ const RoutingMachine = ({ start, dest, isExpanded }: { start: [number, number]; 
              if (routes && routes.length > 0) {
                  const bounds = L.latLngBounds(routes[0].coordinates);
                  routeBoundsRef.current = bounds;
-                 map.fitBounds(bounds, { padding: [40, 40] });
+                 map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
              }
         });
 
@@ -60,9 +105,14 @@ const RoutingMachine = ({ start, dest, isExpanded }: { start: [number, number]; 
     useEffect(() => {
         if (routeBoundsRef.current && map) {
             const timers = [
-                setTimeout(() => map.fitBounds(routeBoundsRef.current!, { padding: [40, 40] }), 150),
-                setTimeout(() => map.fitBounds(routeBoundsRef.current!, { padding: [40, 40] }), 400),
-                setTimeout(() => map.fitBounds(routeBoundsRef.current!, { padding: [40, 40] }), 600)
+                setTimeout(() => {
+                    map.invalidateSize();
+                    map.fitBounds(routeBoundsRef.current!, { padding: [50, 50], maxZoom: 15 });
+                }, 150),
+                setTimeout(() => {
+                    map.invalidateSize();
+                    map.fitBounds(routeBoundsRef.current!, { padding: [50, 50], maxZoom: 15 });
+                }, 400)
             ];
             return () => timers.forEach(clearTimeout);
         }
@@ -122,6 +172,12 @@ const RideMap: React.FC<RideMapProps> = ({ startLocation, currentLocation, path,
                 />
                 
                 <MapSizeUpdater isExpanded={isExpanded} />
+                <FitBoundsUpdater 
+                    startPos={startPos} 
+                    destPos={destinationCoords ? destPos : null} 
+                    currentPos={currentLocation ? [currentLocation.latitude, currentLocation.longitude] : null} 
+                    isExpanded={isExpanded} 
+                />
 
                 {startLocation && (
                     <Marker position={startPos}>

@@ -7,7 +7,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ==========================================
--- 2. CRIAÇÃO DAS TABELAS (SCHEMA)
+-- 2. CRIAÇÃO E MIGRAÇÃO DAS TABELAS (SCHEMA)
 -- ==========================================
 
 -- Tabela de Motoristas (Drivers/Admins)
@@ -40,6 +40,15 @@ CREATE TABLE IF NOT EXISTS passengers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Garantir que driver_id exista caso a tabela já tenha sido criada anteriormente
+DO $$ 
+BEGIN 
+    BEGIN
+        ALTER TABLE passengers ADD COLUMN driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE;
+    EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'coluna driver_id ja existe em passengers';
+    END;
+END $$;
+
 -- Tabela de Corridas (Rides)
 CREATE TABLE IF NOT EXISTS rides (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -54,6 +63,15 @@ CREATE TABLE IF NOT EXISTS rides (
     start_location_json JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Garantir que driver_id exista em rides caso a tabela já tenha sido criada anteriormente
+DO $$ 
+BEGIN 
+    BEGIN
+        ALTER TABLE rides ADD COLUMN driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE;
+    EXCEPTION WHEN duplicate_column THEN RAISE NOTICE 'coluna driver_id ja existe em rides';
+    END;
+END $$;
 
 -- Tabela de Regras de Preço (Fare Rules)
 CREATE TABLE IF NOT EXISTS fare_rules (
