@@ -50,22 +50,18 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
     const isRecordingRef = useRef(false);
 
     const [activeVoiceContext, setActiveVoiceContext] = useState<'passenger' | 'route' | null>(null);
-    const hasProcessedRef = useRef(false);
+    const activeVoiceContextRef = useRef<'passenger' | 'route' | null>(null);
 
     const processFinalTranscription = async (text: string, context: 'passenger' | 'route' | 'all') => {
         const finalQuery = text.trim();
-        console.log("!!!DEBUG: processFinalTranscription iniciada", { text, context });
         
         if (!finalQuery || finalQuery.length < 3) {
-            console.log("!!!DEBUG: Texto muito curto para processar:", finalQuery);
             setVoiceStatus(null);
             return;
         }
         
         setVoiceStatus("Extraindo dados...");
-        console.log("!!!DEBUG: Chamando parseRideInfoFromText...");
         const parsed = await parseRideInfoFromText(finalQuery, context);
-        console.log("!!!DEBUG: parseRideInfoFromText retornou:", parsed);
         
         if (parsed) {
             const successMsg = context === 'passenger' ? "Passageiro OK!" : (context === 'route' ? "Rota OK!" : "Viagem OK!");
@@ -83,10 +79,7 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
             // Atualização do Nome e WhatsApp
             if (context === 'passenger' || context === 'all') {
-                if (isValid(parsed.passengerName)) {
-                    console.log("!!!DEBUG: Atualizando passageiro:", parsed.passengerName);
-                    setPassenger(prev => ({ ...prev, name: String(parsed.passengerName) }));
-                }
+                if (isValid(parsed.passengerName)) setPassenger(prev => ({ ...prev, name: String(parsed.passengerName) }));
                 
                 if (isValid(parsed.whatsapp)) {
                     let cleanWa = String(parsed.whatsapp).replace(/\D/g, '');
@@ -97,7 +90,6 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
                     }
                     if (cleanWa.startsWith('55') && cleanWa.length > 11) cleanWa = cleanWa.substring(2);
                     if (cleanWa.length >= 8 && cleanWa.length <= 11) {
-                        console.log("!!!DEBUG: Atualizando whatsapp:", cleanWa);
                         setPassenger(prev => ({ ...prev, whatsapp: cleanWa }));
                     }
                 }
@@ -105,20 +97,13 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
 
             // Atualização do Destino e Cidade
             if (context === 'route' || context === 'all') {
-                if (isValid(parsed.destinationAddress)) {
-                    console.log("!!!DEBUG: Atualizando endereço:", parsed.destinationAddress);
-                    setDestinationAddress(String(parsed.destinationAddress));
-                }
+                if (isValid(parsed.destinationAddress)) setDestinationAddress(String(parsed.destinationAddress));
                 if (isValid(parsed.destinationNumber)) setDestinationNumber(String(parsed.destinationNumber));
-                if (isValid(parsed.destinationCity)) {
-                    console.log("!!!DEBUG: Atualizando cidade:", parsed.destinationCity);
-                    setDestinationCity(String(parsed.destinationCity));
-                }
+                if (isValid(parsed.destinationCity)) setDestinationCity(String(parsed.destinationCity));
                 
                 if (isValid(parsed.fare)) {
                     let cleanFare = String(parsed.fare).replace(/[^\d.,]/g, '').replace(',', '.');
                     if (cleanFare && !isNaN(parseFloat(cleanFare))) {
-                        console.log("!!!DEBUG: Atualizando tarifa:", cleanFare);
                         setCustomFare(cleanFare);
                     }
                 }
@@ -127,10 +112,10 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             if (context === 'all') setVoiceStatus("Corrida configurada!");
             setTimeout(() => setVoiceStatus(null), 3000);
         } else {
-            console.log("!!!DEBUG: parseRideInfoFromText retornou null ou inválido");
             setVoiceStatus("Sem dados claros no áudio.");
             setTimeout(() => setVoiceStatus(null), 3000);
         }
+        activeVoiceContextRef.current = null;
         setActiveVoiceContext(null);
     };
 
@@ -142,23 +127,8 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             return;
         }
 
-        // If already recording, stop and process immediately
         if (isRecordingRef.current) {
-            hasProcessedRef.current = false; // Reset
-            const text = accumulatedTextRef.current;
-            const currentContext = activeVoiceContext;
-            
-            // Immediate UI update
-            setIsRecording(false);
-            setVoiceStatus("Processando...");
-            
-            recognitionRef.current?.stop(); // This triggers onend later
-            
-            // Immediate processing
-            if (currentContext && text) {
-                hasProcessedRef.current = true; // Atomically mark as processed
-                processFinalTranscription(text, currentContext);
-            }
+            recognitionRef.current?.stop();
             return;
         }
 
@@ -167,9 +137,10 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
         recognition.lang = 'pt-BR';
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
-        recognition.continuous = true; 
+        recognition.continuous = false; 
 
         accumulatedTextRef.current = '';
+        activeVoiceContextRef.current = context;
         setActiveVoiceContext(context);
         
         recognition.onstart = () => {
@@ -201,21 +172,20 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             isRecordingRef.current = false;
             setIsRecording(false);
             setVoiceStatus(null);
+            activeVoiceContextRef.current = null;
+            setActiveVoiceContext(null);
         };
 
         recognition.onend = async () => {
-            if (!hasProcessedRef.current && accumulatedTextRef.current && activeVoiceContext) {
-                const text = accumulatedTextRef.current;
-                const contextToProcess = activeVoiceContext;
-                setVoiceStatus("Processando...");
-                await processFinalTranscription(text, contextToProcess);
-            }
-            
-            // Clean up
             isRecordingRef.current = false;
             setIsRecording(false);
-            setActiveVoiceContext(null);
-            if (!hasProcessedRef.current) {
+            
+            const text = accumulatedTextRef.current;
+            const contextToProcess = activeVoiceContextRef.current;
+            
+            if (text && contextToProcess) {
+                await processFinalTranscription(text, contextToProcess);
+            } else {
                 setVoiceStatus(null);
             }
         };
