@@ -50,7 +50,7 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
     const driverFinancials = useMemo(() => {
         if (!selectedDriverId) return null;
 
-        const driverRides = rideHistory.filter(ride => ride.driverId === selectedDriverId);
+        const driverRides = rideHistory.filter(ride => ride.driverId === selectedDriverId && ride.status === 'completed');
 
         if (driverRides.length === 0) {
             const driverInfo = drivers.find(d => d.id === selectedDriverId) || currentDriver;
@@ -166,7 +166,7 @@ const Financials: React.FC<FinancialsProps> = ({ rideHistory, drivers, currentDr
                                 <div>
                                     <p className="font-bold text-white">{ride.passenger.name}</p>
                                     <p className="text-sm text-gray-400">{ride.destination.address}, {ride.destination.city}</p>
-                                    <p className="text-xs text-gray-500 mt-1">{formatDate(ride.startTime)}</p>
+                                    <p className="text-xs text-gray-500 mt-1">{formatDate(ride.startTime)} • <span className="uppercase">{ride.paymentMethod === 'cash' ? 'Dinheiro' : ride.paymentMethod === 'card' ? 'Cartão' : 'Pix'}</span></p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-xl font-bold text-orange-400">R${ride.fare.toFixed(2)}</p>

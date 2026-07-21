@@ -182,6 +182,14 @@ const RideHistory: React.FC<RideHistoryProps> = ({ rideHistory, currentDriver, d
                                     <p className="text-sm text-white font-bold">{ride.passenger.name}</p>
                                     <p className="text-xs text-green-400 mb-1"><i className="fa-brands fa-whatsapp mr-1"></i> {ride.passenger.whatsapp}</p>
                                     {ride.passenger.cpf && <p className="text-[10px] text-gray-500">CPF: {ride.passenger.cpf}</p>}
+                                    <div className="mt-2 flex gap-2">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${ride.status === 'completed' ? 'bg-green-500/20 text-green-400' : ride.status === 'cancelled' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                            {ride.status === 'completed' ? 'Concluída' : ride.status === 'cancelled' ? 'Cancelada' : 'Pendente'}
+                                        </span>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 uppercase font-bold">
+                                            {ride.paymentMethod === 'cash' ? 'Dinheiro' : ride.paymentMethod === 'card' ? 'Cartão' : 'Pix'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                             <div>

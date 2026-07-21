@@ -25,7 +25,7 @@ export interface AddressSuggestion {
 export interface Ride {
   id?: string;
   passenger: Passenger;
-  originAddress?: string; // Endereço de texto capturado pelo GPS
+  originAddress?: string; 
   destination: {
     address: string;
     city: string;
@@ -36,6 +36,8 @@ export interface Ride {
   fare: number;
   driverId: string;
   startLocation: GeolocationCoordinates | null;
+  status: 'pending' | 'completed' | 'cancelled';
+  paymentMethod: 'cash' | 'card' | 'pix';
 }
 
 export interface Driver {
