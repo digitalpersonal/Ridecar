@@ -65,8 +65,15 @@ const StartRideForm: React.FC<StartRideFormProps> = ({ savedPassengers, onStartR
             // Immediate UI update
             setIsRecording(false);
             if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
+            const text = accumulatedTextRef.current;
+            const currentContext = activeVoiceContext;
+            isRecordingRef.current = false;
             recognitionRef.current?.stop();
+            
             setVoiceStatus("Processando...");
+            if (currentContext) {
+                processFinalTranscription(text, currentContext);
+            }
             return;
         }
 
